@@ -174,16 +174,12 @@ class HoloTrackerCore:
             print(f"{attr}: {value}")
         print("==============================")
 
-    def _to_uint8(self, arr, use_log=False, display_type=""):
+    def _to_uint8(self, arr):
         """Normalize array to uint8 for display (0-255 range)"""
         arr = np.array(arr)  # ensure numpy
         if np.iscomplexobj(arr):
             arr = np.abs(arr)
         arr = arr.astype(np.float64)
-        
-        # Apply logarithm if requested (except for FFT displays which already use log)
-        if use_log and "FFT" not in display_type:
-            arr = np.log(arr + 1e-10)
         
         mx = arr.max() if arr.size else 0.0
         mn = arr.min() if arr.size else 0.0
@@ -211,13 +207,17 @@ class HoloTrackerCore:
             def _fallback(type_name):
                 # print(f"no '{type_name}' available")
                 arr = _get_raw_array()
-                return Image.fromarray(self._to_uint8(arr, use_log, display_type))
+                if use_log:
+                    arr = np.log(arr + 1e-10)
+                return Image.fromarray(self._to_uint8(arr))
 
             # RAW_HOLOGRAM: use in-memory if available
             if display_type == "RAW_HOLOGRAM":
                 arr = _get_raw_array()
                 stat_plane(arr, label="RAW_HOLOGRAM")
-                image = Image.fromarray(self._to_uint8(arr, use_log, display_type))
+                if use_log:
+                    arr = np.log(arr + 1e-10)
+                image = Image.fromarray(self._to_uint8(arr))
                 return self._apply_additional_display(image, additional_display, display_type, plane_number)
 
             # CLEANED_HOLOGRAM
@@ -225,7 +225,9 @@ class HoloTrackerCore:
                 if self.memory_allocated and self.h_cleaned_holo is not None:
                     arr = self.h_cleaned_holo.copy()
                     stat_plane(arr, label="CLEANED_HOLOGRAM")
-                    image = Image.fromarray(self._to_uint8(arr, use_log, display_type))
+                    if use_log:
+                        arr = np.log(arr + 1e-10)
+                    image = Image.fromarray(self._to_uint8(arr))
                     return self._apply_additional_display(image, additional_display, display_type, plane_number)
                 return _fallback("CLEANED_HOLOGRAM")
 
@@ -238,7 +240,9 @@ class HoloTrackerCore:
                         if np.iscomplexobj(h_filtered):
                             h_filtered = np.abs(h_filtered)
                         stat_plane(h_filtered, label="FILTERED_HOLOGRAM")
-                        image = Image.fromarray(self._to_uint8(h_filtered, use_log, display_type))
+                        if use_log:
+                            h_filtered = np.log(h_filtered + 1e-10)
+                        image = Image.fromarray(self._to_uint8(h_filtered))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number)
                     except Exception:
                         pass
@@ -249,7 +253,9 @@ class HoloTrackerCore:
                         if np.iscomplexobj(h_filtered):
                             h_filtered = np.abs(h_filtered)
                         stat_plane(h_filtered, label="FILTERED_HOLOGRAM")
-                        image = Image.fromarray(self._to_uint8(h_filtered, use_log, display_type))
+                        if use_log:
+                            h_filtered = np.log(h_filtered + 1e-10)
+                        image = Image.fromarray(self._to_uint8(h_filtered))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number)
                     except Exception:
                         return _fallback("FILTERED_HOLOGRAM")
@@ -263,9 +269,9 @@ class HoloTrackerCore:
                         if np.iscomplexobj(h_fft):
                             h_fft = np.abs(h_fft)
                         stat_plane(h_fft, label="FFT_HOLOGRAM")
-                        # logarithmic scaling for FFT visualization
-                        h_fft = np.log(h_fft + 1e-10)
-                        image = Image.fromarray(self._to_uint8(h_fft, use_log, display_type))
+                        if use_log:
+                            h_fft = np.log(h_fft + 1e-10)
+                        image = Image.fromarray(self._to_uint8(h_fft))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number)
                     except Exception:
                         return _fallback("FFT_HOLOGRAM")
@@ -279,8 +285,9 @@ class HoloTrackerCore:
                         if np.iscomplexobj(h_fft_filtered):
                             h_fft_filtered = np.abs(h_fft_filtered)
                         stat_plane(h_fft_filtered, label="FFT_FILTERED_HOLOGRAM")
-                        h_fft_filtered = np.log(h_fft_filtered + 1e-10)
-                        image = Image.fromarray(self._to_uint8(h_fft_filtered, use_log, display_type))
+                        if use_log:
+                            h_fft_filtered = np.log(h_fft_filtered + 1e-10)
+                        image = Image.fromarray(self._to_uint8(h_fft_filtered))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number)
                     except Exception:
                         return _fallback("FFT_FILTERED_HOLOGRAM")
@@ -295,7 +302,9 @@ class HoloTrackerCore:
                             plane = cp.asnumpy(volume_gpu[plane_number, :, :])
                             plane = np.abs(plane)
                             stat_plane(plane, label=f"VOLUME_PLANE_{plane_number}")
-                            image = Image.fromarray(self._to_uint8(plane, use_log, display_type))
+                            if use_log:
+                                plane = np.log(plane + 1e-10)
+                            image = Image.fromarray(self._to_uint8(plane))
                             return self._apply_additional_display(image, additional_display, display_type, plane_number)
                     except Exception:
                         pass
@@ -307,7 +316,9 @@ class HoloTrackerCore:
                         projection = cp.sum(self.d_volume_module, axis=0)
                         projection = cp.asnumpy(projection)
                         stat_plane(projection, label="XY_SUM_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'XY')
                     except Exception:
                         pass
@@ -319,7 +330,9 @@ class HoloTrackerCore:
                         projection = cp.sum(self.d_volume_module, axis=1)
                         projection = cp.asnumpy(projection)
                         stat_plane(projection, label="XZ_SUM_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'XZ')
                     except Exception:
                         pass
@@ -345,7 +358,9 @@ class HoloTrackerCore:
                             projection = np.sum(volume_cpu, axis=2)
 
                         stat_plane(projection, label="YZ_SUM_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'YZ')
                     except Exception as e:
                         print(f"Error in YZ_SUM_PROJECTION: {e}")
@@ -358,7 +373,9 @@ class HoloTrackerCore:
                         projection = cp.max(self.d_volume_module, axis=0)
                         projection = cp.asnumpy(projection)
                         stat_plane(projection, label="XY_MAX_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'XY')
                     except Exception:
                         pass
@@ -370,7 +387,9 @@ class HoloTrackerCore:
                         projection = cp.max(self.d_volume_module, axis=1)
                         projection = cp.asnumpy(projection)
                         stat_plane(projection, label="XZ_MAX_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'XZ')
                     except Exception:
                         pass
@@ -391,7 +410,9 @@ class HoloTrackerCore:
                             projection = np.max(volume_cpu, axis=2)
                         
                         stat_plane(projection, label="YZ_MAX_PROJECTION")
-                        image = Image.fromarray(self._to_uint8(projection, use_log, display_type))
+                        if use_log:
+                            projection = np.log(projection + 1e-10)
+                        image = Image.fromarray(self._to_uint8(projection))
                         return self._apply_additional_display(image, additional_display, display_type, plane_number, 'YZ')
                     except Exception as e:
                         # print(f"Error in YZ_MAX_PROJECTION: {e}")
@@ -400,14 +421,18 @@ class HoloTrackerCore:
 
             # Default: show raw hologram
             arr = _get_raw_array()
-            return Image.fromarray(self._to_uint8(arr, use_log, display_type))
+            if use_log:
+                arr = np.log(arr + 1e-10)
+            return Image.fromarray(self._to_uint8(arr))
 
         except Exception as e:
             # Minimal error reporting
             # print(f"Error in get_display_image: {e}")
             try:
                 arr = self.h_raw_holo if self.h_raw_holo is not None else np.zeros((100,100), dtype=np.float64)
-                return Image.fromarray(self._to_uint8(arr, use_log, display_type))
+                if use_log:
+                    arr = np.log(arr + 1e-10)
+                return Image.fromarray(self._to_uint8(arr))
             except:
                 return Image.fromarray(np.zeros((100, 100), dtype=np.uint8))
 
@@ -667,7 +692,7 @@ class HoloTrackerCore:
                     self.h_cleaned_holo = np.power(self.h_cleaned_holo, 0.8).astype(np.float32)  # Limit extreme values
 
             else:
-                self.h_cleaned_holo[:] = self.h_raw_holo
+                self.h_cleaned_holo = self.h_raw_holo.copy()
             
             # Transfer cleaned hologram to GPU - reuse pre-allocated array
             self.d_holo[:] = cp.asarray(self.h_cleaned_holo.astype(cp.complex64))

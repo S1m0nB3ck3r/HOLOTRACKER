@@ -408,7 +408,9 @@ class HoloTrackerApp:
         ttk.Label(cleaning_frame, text="Remove mean Hologram:").grid(row=0, column=0, sticky="w", pady=1)
         self.remove_mean_check = ttk.Checkbutton(cleaning_frame, text="Off/On", command=self.on_remove_mean_changed)
         self.remove_mean_check.grid(row=0, column=1, sticky="w", pady=1)
-        self.remove_mean_check.last_value = None
+        # Initialize with default state (will be updated by load_parameters)
+        self.remove_mean_check.state(['!alternate', '!selected'])  # Explicitly disable alternate state and uncheck
+        self.remove_mean_check.last_value = False
         
         ttk.Label(cleaning_frame, text="Cleaning type:").grid(row=1, column=0, sticky="w", pady=1)
         self.type_cleaning_combobox = ttk.Combobox(cleaning_frame, values=["subtraction", "division"], width=15)
@@ -1487,10 +1489,11 @@ class HoloTrackerApp:
                 # Update last_value for change detection
                 if hasattr(combobox, 'last_value'):
                     combobox.last_value = combobox.get()
+        # Load remove_mean parameter and ensure no alternate state
         if self.parameters.get("remove_mean", False):
-            self.remove_mean_check.state(['selected'])
+            self.remove_mean_check.state(['!alternate', 'selected'])
         else:
-            self.remove_mean_check.state(['!selected'])
+            self.remove_mean_check.state(['!alternate', '!selected'])
         # Update last_value for remove_mean checkbox
         if hasattr(self.remove_mean_check, 'last_value'):
             self.remove_mean_check.last_value = self.remove_mean_check.instate(['selected'])
