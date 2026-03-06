@@ -15,6 +15,7 @@ import pandas as pd
 import math
 import json
 from datetime import datetime
+from . import processor
 try:
     import ttkbootstrap as ttkb
     from ttkbootstrap import Style
@@ -359,7 +360,7 @@ class CodeLinkGUI:
 
     def _load_localisation_file(self, path):
         """Background worker: delegate CSV loading to processor module."""
-        from code_link import processor
+    
         df = processor.load_localisation_csv(path)
         return df
 
