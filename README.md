@@ -43,7 +43,6 @@ HoloTracker is a comprehensive software suite for analyzing digital holograms to
 - pandas
 - opencv-python (cv2)
 - Pillow (PIL)
-- scikit-image
 - ttkbootstrap
 - trackpy
 - cupy (for GPU-accelerated computing, requires CUDA)
@@ -56,7 +55,7 @@ HoloTracker is a comprehensive software suite for analyzing digital holograms to
 
 ```bash
 git clone https://github.com/S1m0nB3ck3r/HOLOTRACKER.git
-cd HOLOTRACKER_FULL_PYTHON
+cd HOLOTRACKER
 ```
 
 Or download and extract the ZIP file from GitHub.
@@ -92,7 +91,7 @@ pip install -r requirements.txt
 If `requirements.txt` is not present, install packages manually:
 
 ```bash
-pip install numpy scipy matplotlib pandas opencv-python Pillow scikit-image ttkbootstrap trackpy
+pip install numpy scipy matplotlib pandas opencv-python Pillow ttkbootstrap trackpy
 ```
 
 ### 4. Install CuPy for GPU Acceleration
@@ -114,7 +113,9 @@ pip install cupy-cuda12x
 nvcc --version
 ```
 
-If you don't have a compatible NVIDIA GPU or CUDA installed, the software will fall back to CPU processing (slower but functional).
+**An NVIDIA GPU with CUDA is required.** There is no CPU fallback: without a working
+CuPy installation, HoloTracker Locate reports an error and does not process holograms.
+HoloTracker Link, which only relies on trackpy, works without a GPU.
 
 For more information, see the [CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html).
 
@@ -180,8 +181,10 @@ python code_link/main_holotracker_link.py
    - Click "Play" for trajectory animation
    - Click "SAVE TRAJECTORIES" to export results
 
-**Output:** CSV file with original columns PLUS:
-- TRAJECTORY NUMBER (unique ID for each linked trajectory)
+**Output:** `TRAJECTORIES_YYYYMMDD_HHMMSS.csv`, written next to the input file. It
+reproduces the input CSV with one change: the `OBJECT NUMBER` column is **replaced** by
+`TRAJECTORY NUMBER`, the identifier of the linked trajectory. Detections that were not
+kept (too short a trajectory, see Min Length) get `-1`.
 
 ## Typical Workflow
 
@@ -204,7 +207,7 @@ python code_locate/main_holotracker_locate.py
 - Compute mean hologram (recommended)
 - Test parameters on one hologram
 - Run batch processing
-- Output: `LOCALIZATIONS_YYYYMMDD_HHMMSS.csv`
+- Output: `RESULT_YYYYMMDD_HHMMSS.csv`, written in the hologram directory
 
 **Step 3: Run HoloTracker Link**
 ```bash
@@ -242,7 +245,7 @@ python code_link/main_holotracker_link.py
 
 **Focus Metric:** Recommended options:
 - **TENEGRAD:** Best general-purpose (gradient-based)
-- **MEAN_LOG_ALL:** Robust combination of multiple metrics
+- **MEAN_GEO_ALL:** Robust combination of multiple metrics (geometric mean of the 5 criteria)
 
 ### HoloTracker Link
 
@@ -297,12 +300,15 @@ HOLOGRAM NUMBER,OBJECT NUMBER,X POSITION (m),Y POSITION (m),Z POSITION (m),NUMBE
 ```
 
 ### Output from HoloTracker Link
+
+`OBJECT NUMBER` is replaced by `TRAJECTORY NUMBER` (`-1` = detection not kept):
+
 ```csv
-HOLOGRAM NUMBER,OBJECT NUMBER,X POSITION (m),Y POSITION (m),Z POSITION (m),NUMBER OF VOXEL,TRAJECTORY NUMBER
-1,1,0.000123,0.000456,0.000789,150,0
-1,2,0.000234,0.000567,0.000890,200,1
-2,1,0.000125,0.000458,0.000791,148,0
-2,2,0.000236,0.000569,0.000892,198,1
+HOLOGRAM NUMBER,X POSITION (m),Y POSITION (m),Z POSITION (m),NUMBER OF VOXEL,TRAJECTORY NUMBER
+1,0.000123,0.000456,0.000789,150,0
+1,0.000234,0.000567,0.000890,200,1
+2,0.000125,0.000458,0.000791,148,0
+2,0.000236,0.000569,0.000892,198,1
 ```
 
 ## GUI Features
@@ -355,7 +361,7 @@ For bug reports, feature requests, or contributions, please contact:
 
 - **Trackpy:** HoloTracker Link builds upon the excellent Trackpy library developed by the soft-matter community
 - **ttkbootstrap:** Modern UI theme support
-- **Scientific Python Stack:** NumPy, SciPy, Matplotlib, scikit-image
+- **Scientific Python Stack:** NumPy, SciPy, Matplotlib, pandas
 
 ## Version History
 
