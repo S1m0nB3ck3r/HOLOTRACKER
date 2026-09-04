@@ -206,3 +206,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Claude Code
+CLAUDE.md
+
+# Archives de code (snapshots hors git)
+archive/
