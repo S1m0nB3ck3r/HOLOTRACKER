@@ -1,0 +1,90 @@
+{
+ "csv_colonnes": [
+  "HOLOGRAM NUMBER",
+  "OBJECT NUMBER",
+  "X POSITION (m)",
+  "Y POSITION (m)",
+  "Z POSITION (m)",
+  "NUMBER OF VOXEL"
+ ],
+ "csv_nb_lignes": 108,
+ "csv_nb_images": 6,
+ "csv_lignes_fantomes": 0,
+ "sans_detection_nb_lignes": 0,
+ "sans_detection_colonnes": [
+  "HOLOGRAM NUMBER",
+  "OBJECT NUMBER",
+  "X POSITION (m)",
+  "Y POSITION (m)",
+  "Z POSITION (m)",
+  "NUMBER OF VOXEL"
+ ],
+ "charge_nb_lignes": 108,
+ "charge_index_conforme": true,
+ "liaisons": {
+  "0": {
+   "nb_trajectoires": 31,
+   "nb_points": 108,
+   "longueur_min": 1,
+   "longueur_max": 6,
+   "index_conforme": true,
+   "nb_lignes_attribuees": 108,
+   "colonnes_sortie": [
+    "HOLOGRAM NUMBER",
+    "X POSITION (m)",
+    "Y POSITION (m)",
+    "Z POSITION (m)",
+    "NUMBER OF VOXEL",
+    "TRAJECTORY NUMBER"
+   ]
+  },
+  "2": {
+   "nb_trajectoires": 24,
+   "nb_points": 101,
+   "longueur_min": 2,
+   "longueur_max": 6,
+   "index_conforme": true,
+   "nb_lignes_attribuees": 101,
+   "colonnes_sortie": [
+    "HOLOGRAM NUMBER",
+    "X POSITION (m)",
+    "Y POSITION (m)",
+    "Z POSITION (m)",
+    "NUMBER OF VOXEL",
+    "TRAJECTORY NUMBER"
+   ]
+  },
+  "4": {
+   "nb_trajectoires": 15,
+   "nb_points": 81,
+   "longueur_min": 4,
+   "longueur_max": 6,
+   "index_conforme": true,
+   "nb_lignes_attribuees": 81,
+   "colonnes_sortie": [
+    "HOLOGRAM NUMBER",
+    "X POSITION (m)",
+    "Y POSITION (m)",
+    "Z POSITION (m)",
+    "NUMBER OF VOXEL",
+    "TRAJECTORY NUMBER"
+   ]
+  },
+  "16": {
+   "nb_trajectoires": 0,
+   "nb_points": 0,
+   "longueur_min": null,
+   "longueur_max": null,
+   "index_conforme": true,
+   "nb_lignes_attribuees": 0,
+   "colonnes_sortie": null
+  }
+ },
+ "_meta": {
+  "genere_le": "2026-09-04 09:18:04",
+  "gpu": "Quadro RTX 3000",
+  "cupy": "12.2.0",
+  "python": "3.10.9",
+  "note": "Étalon de la couture entre les deux applications."
+ }
+}
