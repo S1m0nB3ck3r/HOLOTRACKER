@@ -49,8 +49,8 @@ class Focus_type(Enum):
     TENEGRAD = 4
     SUM_OF_INTENSITY = 5
     SUM_OF_GRADIENT = 6
-    MEAN_ALL = 7
-    MEAN_LOG_ALL = 8
+    MEAN_ARITH_ALL = 7
+    MEAN_GEO_ALL = 8
 
 def focus_sum_of_gradient(d_volume_IN, d_focus_OUT, sumSize):
     """
@@ -201,10 +201,16 @@ def focus_SUM_OF_INTENSITY(d_volume_IN, d_focus_OUT, sumSize):
             plane = d_volume_IN[p,:,:]**2
             cp_ndimage.convolve(plane, convolve_plane, output = d_focus_OUT[p,:,:], mode = 'reflect')
 
-def focus_MEAN_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
+def focus_MEAN_ARITH_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
     """
-    Calcule la moyenne de tous les types de focus
-    Traitement plan par plan pour économiser la mémoire GPU
+    Calcule la moyenne ARITHMETIQUE de tous les types de focus.
+
+    Attention: les cinq criteres n'ont pas le meme ordre de grandeur (intensite,
+    laplacien au carre, variance...). La moyenne est donc dominee par le plus grand en
+    magnitude, pas par le plus informatif. MEAN_GEO_ALL, qui est une moyenne geometrique,
+    equilibre les contributions et est generalement preferable.
+
+    Traitement plan par plan pour economiser la memoire GPU.
     """
     nb_planes, height, width = d_volume_IN.shape
     
@@ -233,11 +239,21 @@ def focus_MEAN_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
         # Store averaged result for this plane
         d_focus_OUT[plane_idx, :, :] = accumulator_plane / count
 
-def focus_MEAN_LOG_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
+def focus_MEAN_GEO_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
     """
-    Calcule la moyenne logarithmique de tous les types de focus
-    moyenne_log = exp(mean(log(x))) pour éviter overflow/underflow
-    Traitement plan par plan pour économiser la mémoire GPU
+    Calcule la moyenne GEOMETRIQUE de tous les types de focus.
+
+        exp( (1/n) * somme( log(x_i) ) )  =  ( produit des x_i ) ^ (1/n)
+
+    Le passage par le logarithme n'est pas une autre moyenne: c'est la forme
+    numeriquement stable de la moyenne geometrique, qui evite de multiplier cinq
+    grandeurs entre elles (debordement ou annulation en float32).
+
+    Contrairement a MEAN_ARITH_ALL, qui fait une moyenne arithmetique de criteres d'echelles
+    tres differentes et se retrouve domine par le plus grand en magnitude, la moyenne
+    geometrique donne le meme poids relatif a chaque critere.
+
+    Traitement plan par plan pour economiser la memoire GPU.
     """
     nb_planes, height, width = d_volume_IN.shape
     
@@ -259,12 +275,13 @@ def focus_MEAN_LOG_ALL(d_volume_IN, d_focus_OUT, sumSize, d_accumulator=None):
             
             focus_method(plane_view_in, temp_plane_view, sumSize)
             
-            # Accumulate log of result (remove the extra dimension)
-            # Ajouter un epsilon pour éviter log(0)
+            # Accumuler le log du resultat (retirer la dimension supplementaire).
+            # Epsilon pour eviter log(0): rend la moyenne geometrique approchee lorsqu'un
+            # critere vaut exactement zero sur un pixel.
             accumulator_plane[:] = accumulator_plane + cp.log(temp_plane_view[0, :, :] + 1e-10)
             count += 1
         
-        # Store averaged result for this plane (exp of mean of logs)
+        # Moyenne geometrique du plan: exp de la moyenne des logs
         d_focus_OUT[plane_idx, :, :] = cp.exp(accumulator_plane / count)
 
 def focus(d_volume_IN, d_focus_OUT, sumSize, type_of_focus):
@@ -279,7 +296,7 @@ def focus(d_volume_IN, d_focus_OUT, sumSize, type_of_focus):
         focus_SUM_OF_INTENSITY(d_volume_IN, d_focus_OUT, sumSize)
     elif type_of_focus == Focus_type.SUM_OF_GRADIENT:
         focus_sum_of_gradient(d_volume_IN, d_focus_OUT, sumSize)
-    elif type_of_focus == Focus_type.MEAN_ALL:
-        focus_MEAN_ALL(d_volume_IN, d_focus_OUT, sumSize)
-    elif type_of_focus == Focus_type.MEAN_LOG_ALL:
-        focus_MEAN_LOG_ALL(d_volume_IN, d_focus_OUT, sumSize)
+    elif type_of_focus == Focus_type.MEAN_ARITH_ALL:
+        focus_MEAN_ARITH_ALL(d_volume_IN, d_focus_OUT, sumSize)
+    elif type_of_focus == Focus_type.MEAN_GEO_ALL:
+        focus_MEAN_GEO_ALL(d_volume_IN, d_focus_OUT, sumSize)

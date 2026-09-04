@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """
-Filename: main_holo_python.py
+Filename: script_localisation_pipeline.py
 
 Description:
 Script for testing or executing the holograms analysis (locating objects in 3d coordinates on holograms, and linking positions to determine objects trajectories) without Labview software interface.
 
 Author: Simon BECKER
+mail: simon.becker@univ-lorraine.fr
 Date: 2024-07-09
 
 License:
@@ -64,9 +65,14 @@ cam_nb_pix_X = 1024
 cam_nb_pix_Y = 1024
 nb_plane = 200
 cam_pix_size = 7e-6
-dx = 1000000 * cam_pix_size / cam_magnification #in µm
-dy = 1000000 * cam_pix_size / cam_magnification #in µm
-dz = 0.2 #in µm
+# Toutes les distances sont en METRES, comme dans l'application graphique.
+# Ce script exprimait auparavant dx, dy et dz en micrometres tout en produisant un CSV
+# de meme forme que celui du GUI: deux fichiers identiques d'aspect n'avaient pas les
+# memes unites.
+dx = cam_pix_size / cam_magnification   # en metres
+dy = cam_pix_size / cam_magnification   # en metres
+dz = 0.2e-6                             # en metres
+distance_ini = 0.0                      # distance de propagation du premier plan, en metres
 
 
 # threshold, focus and CCL parameters
@@ -90,7 +96,20 @@ d_volume_module = cp.zeros(shape = (nb_plane, cam_nb_pix_Y, cam_nb_pix_X), dtype
 d_bin_volume_focus = cp.zeros(shape = (nb_plane, cam_nb_pix_Y, cam_nb_pix_X), dtype = cp.bool_)
 
 # mean Holo removing
-h_mean_holo = calc_holo_moyen(path, cam_nb_pix_X, cam_nb_pix_Y, 'bmp')
+# Hologramme moyen, avec un cache sur disque: le recalculer a chaque lancement du script
+# coute une lecture complete de la sequence. Le cache est explicite ici plutot que cache
+# dans calc_holo_moyen, pour qu'on voie d'un coup d'oeil ce qui se passe.
+chemin_cache = os.path.join(path, 'mean', 'mean_holo.npy')
+if os.path.exists(chemin_cache):
+    h_mean_holo = np.load(chemin_cache)
+else:
+    # taille=... recadre chaque image au centre a la taille du capteur utilisee ici.
+    # type_moyenne='geometrique' est aussi disponible depuis l'unification.
+    h_mean_holo, _, _ = calc_holo_moyen(
+        lister_images(path, type_image),
+        type_moyenne='arithmetique',
+        taille=(cam_nb_pix_X, cam_nb_pix_Y),
+        fichiers_sortie=(chemin_cache,))
 d_mean_holo = cp.asarray(h_mean_holo)
 # img_mean_holo = Image.fromarray(h_mean_holo)
 #img_mean_holo.show()
@@ -124,7 +143,7 @@ for image in os.listdir(path):
         propag.volume_propag_angular_spectrum_to_module(
             d_holo, d_fft_holo, d_fft_holo_filtered, d_KERNEL,
             d_holo_filtered, d_fft_holo_propag, d_holo_propag, d_volume_module,
-            medium_wavelenght, cam_magnification, cam_pix_size, cam_nb_pix_X, cam_nb_pix_Y, 0.0, dz * 1e-6, nb_plane, 15, 125)
+            medium_wavelenght, cam_magnification, cam_pix_size, cam_nb_pix_X, cam_nb_pix_Y, distance_ini, dz, nb_plane, 15, 125)
         t2 = time.perf_counter()
 
         if display_images:
@@ -157,11 +176,12 @@ for image in os.listdir(path):
 
         #label analysis
         features = np.ndarray(shape = (number_of_labels,), dtype = dobjet)
-        features = CCA_CUDA_float(d_labels, d_volume_module, number_of_labels, i_image, cam_nb_pix_X, cam_nb_pix_Y, nb_plane, dx, dy, dz)
+        features = CCA_CUDA_float(d_labels, d_volume_module, number_of_labels, i_image, cam_nb_pix_X, cam_nb_pix_Y, nb_plane, dx, dy, dz, z_offset = distance_ini)
 
         # features_filtered = CCL_filter(features, 1, 0)
         t5 = time.perf_counter()
 
+        # Colonnes identiques a celles du CSV du GUI, en metres.
         positions = pd.DataFrame(features, columns = ['i_image','baryX','baryY','baryZ','nb_pix'])
         positions.to_csv(result_filename, mode = 'a', index = False, header = False)
 

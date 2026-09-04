@@ -185,16 +185,17 @@ def CCL3D(d_bin_volume, d_focus_volume,  t_threshold, threshold, n_connectivity 
     else:
         binaries_Focus_Volume_local_contrast(d_bin_volume, d_focus_volume, threshold, 20, 10)
 
-    nbpix = np.sum(cp.asnumpy(d_bin_volume), keepdims = False)
-    #print('nb TRUE = ', nbpix)
-    #print('percent = ', 100.0 * nbpix / (sizeX * sizeY * sizeZ))
-    
+    # NOTE: un np.sum(cp.asnumpy(d_bin_volume)) figurait ici. Il rapatriait tout le volume
+    # binaire sur le CPU (~200 Mo pour 200 plans en 1024x1024) a chaque hologramme, pour
+    # une valeur qui n'etait utilisee que par deux print commentes. Si le comptage est
+    # necessaire un jour, noter que cp.count_nonzero passe par CUB et echoue sur une
+    # installation ou nvcc ne peut pas compiler (cf. la note dans projection_bool).
     labels, num_label = cp_ndimage.label(d_bin_volume, pattern_connectivity)
 
     return(labels, num_label)
 
 @jit.rawkernel()
-def device_CCA(d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, dx, dy, dz):
+def device_CCA(d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset):
 
     index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     planSize = sizeX * sizeY
@@ -209,7 +210,10 @@ def device_CCA(d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, 
             index = label-1
             posX = ii * dx
             posY = jj * dy
-            posZ = kk * dz
+            # z_offset = distance de propagation du premier plan (distance_ini). Sans lui,
+            # la coordonnee Z exportee est relative au premier plan reconstruit alors que
+            # la colonne du CSV s'intitule 'Z POSITION (m)'.
+            posZ = z_offset + kk * dz
             focus = d_volume_focus[kk, jj, ii]
             pxSumX = posX * focus
             pxSumY = posY * focus
@@ -233,7 +237,7 @@ def device_CCA(d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, 
     jit.syncthreads()
 
 @jit.rawkernel()
-def device_CCA_plane(d_plane_label, d_plane_focus, d_features, sizeX, sizeY, dx, dy, dz, planeNumber):
+def device_CCA_plane(d_plane_label, d_plane_focus, d_features, sizeX, sizeY, dx, dy, dz, planeNumber, z_offset):
     #version optimisé de device_CCA pour ne travailler que sur un plan et économiser de la méméoire GPU
     index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     planSize = sizeX * sizeY
@@ -247,7 +251,7 @@ def device_CCA_plane(d_plane_label, d_plane_focus, d_features, sizeX, sizeY, dx,
             index = label-1
             posX = ii * dx
             posY = jj * dy
-            posZ = planeNumber * dz
+            posZ = z_offset + planeNumber * dz
             focus = d_plane_focus[jj,ii]
             pxSumX = posX * focus
             pxSumY = posY * focus
@@ -270,23 +274,19 @@ def device_CCA_plane(d_plane_label, d_plane_focus, d_features, sizeX, sizeY, dx,
             
     jit.syncthreads()
 
-def CCA_CUDA(h_volume_label, d_volume_focus, number_of_labels, i_image, sizeX, sizeY, sizeZ, dx, dy, dz):
+def CCA_CUDA(h_volume_label, d_volume_focus, number_of_labels, i_image, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset = 0.0):
 
-    d_features = cp.ndarray(shape = (number_of_labels, 5), dtype = cp.float32)
-
-    for i in range(number_of_labels):
-        d_features[i, 0] = 0.0  #nb_pix 
-        d_features[i, 1] = 0.0  #psSumX
-        d_features[i, 2] = 0.0  #psSumY
-        d_features[i, 3] = 0.0  #psSumZ
-        d_features[i, 4] = 0.0  #pSum
+    # colonnes: 0=nb_pix, 1=pxSumX, 2=pxSumY, 3=pxSumZ, 4=pSum
+    # cp.zeros remplace une boucle Python qui ecrivait les 5 colonnes label par label,
+    # soit 5 x number_of_labels lancements de noyau pour une simple initialisation.
+    d_features = cp.zeros(shape = (number_of_labels, 5), dtype = cp.float32)
 
     sizeX, sizeY, sizeZ = h_volume_label.shape
     n_threads = 1024
     n_blocks = (sizeX * sizeY * sizeZ)//1024 +1
     d_volume_label = cp.asarray(h_volume_label)
 
-    device_CCA[n_blocks, n_threads](d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, dx, dy, dz)
+    device_CCA[n_blocks, n_threads](d_volume_label, d_volume_focus, d_features, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset)
     
     h_features = cp.asnumpy(d_features)
 
@@ -310,16 +310,17 @@ def CCA_CUDA(h_volume_label, d_volume_focus, number_of_labels, i_image, sizeX, s
 
     return features
 
-def CCA_CUDA_float(volume_label, d_volume_focus, number_of_labels, i_image, sizeX, sizeY, sizeZ, dx, dy, dz):
+def CCA_CUDA_float(volume_label, d_volume_focus, number_of_labels, i_image, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset = 0.0):
+    """Barycentres ponderes par le focus, en metres.
 
-    d_CCA = cp.ndarray(shape = (number_of_labels, 5), dtype = cp.float32)
+    z_offset : distance de propagation du premier plan (distance_ini), ajoutee a la
+    coordonnee Z pour que celle-ci soit absolue et non relative au premier plan.
+    """
 
-    for i in range(number_of_labels):
-        d_CCA[i, 0] = 0.0  #nb_pix 
-        d_CCA[i, 1] = 0.0  #psSumX
-        d_CCA[i, 2] = 0.0  #psSumY
-        d_CCA[i, 3] = 0.0  #psSumZ
-        d_CCA[i, 4] = 0.0  #pSum
+    # colonnes: 0=nb_pix, 1=pxSumX, 2=pxSumY, 3=pxSumZ, 4=pSum
+    # cp.zeros remplace une boucle Python qui ecrivait les 5 colonnes label par label,
+    # soit 5 x number_of_labels lancements de noyau pour une simple initialisation.
+    d_CCA = cp.zeros(shape = (number_of_labels, 5), dtype = cp.float32)
 
     sizeZ, sizeY, sizeX = volume_label.shape
     n_threads = 1024
@@ -327,9 +328,9 @@ def CCA_CUDA_float(volume_label, d_volume_focus, number_of_labels, i_image, size
 
     if isinstance(volume_label, np.ndarray):
         v_label = cp.asarray(volume_label)
-        device_CCA[n_blocks, n_threads](v_label, d_volume_focus, d_CCA, sizeX, sizeY, sizeZ, dx, dy, dz)
+        device_CCA[n_blocks, n_threads](v_label, d_volume_focus, d_CCA, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset)
     else:
-        device_CCA[n_blocks, n_threads](volume_label, d_volume_focus, d_CCA, sizeX, sizeY, sizeZ, dx, dy, dz)
+        device_CCA[n_blocks, n_threads](volume_label, d_volume_focus, d_CCA, sizeX, sizeY, sizeZ, dx, dy, dz, z_offset)
 
     h_CCA = cp.asnumpy(d_CCA)
 
@@ -346,19 +347,21 @@ def CCA_CUDA_float(volume_label, d_volume_focus, number_of_labels, i_image, size
     return features
 
 def CCL_filter(features_in, nb_vox_min, nb_vox_max):
-    features_out = np.ndarray(shape=(0, 5), dtype=np.float32)
-    
-    for i in range(features_in.shape[0]):
-        nb_vox = features_in[i, 4]
-        keep = True
-        
-        if nb_vox_min != 0 and nb_vox < nb_vox_min:
-            keep = False
-        if nb_vox_max != 0 and nb_vox > nb_vox_max:
-            keep = False
-        
-        if keep:
-            features_out = np.append(features_out, features_in[i:i+1], axis=0)
-    
-    return features_out
+    """Garde les objets dont le nombre de voxels est dans [nb_vox_min, nb_vox_max].
+    Une borne a 0 signifie 'pas de limite de ce cote'.
+
+    Masque booleen: l'implementation precedente reconstruisait le tableau par np.append
+    a chaque objet retenu, soit un cout quadratique en nombre d'objets.
+    """
+    if features_in.shape[0] == 0:
+        return features_in
+
+    nb_vox = features_in[:, 4]
+    keep = np.ones(features_in.shape[0], dtype=bool)
+    if nb_vox_min != 0:
+        keep &= nb_vox >= nb_vox_min
+    if nb_vox_max != 0:
+        keep &= nb_vox <= nb_vox_max
+
+    return features_in[keep]
 

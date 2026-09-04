@@ -10,6 +10,11 @@ import json
 import os
 from ui_styles import ICONS, format_button_text, create_icon_button
 
+# Journal: voir holo_log.py. Les exceptions ignorées y laissent une trace,
+# avec fichier, fonction et ligne, sans interrompre l'application.
+import logging
+log = logging.getLogger(__name__)
+
 class ToolTip:
     """Create a tooltip for a given widget"""
     def __init__(self, widget, text='widget info'):
@@ -318,7 +323,7 @@ class HoloTrackerApp:
                 dialog.geometry(f"{final_width}x{final_height}")
                 
             except tk.TclError:
-                pass  # Dialog may have been destroyed
+                log.debug("exception ignorée", exc_info=True)  # Dialog may have been destroyed
         
         # Center dialog and apply auto-resize
         dialog.update_idletasks()
@@ -384,7 +389,7 @@ class HoloTrackerApp:
         focus_frame = ttk.LabelFrame(scrollable_frame, text="Focus", padding=(5, 2))
         focus_frame.pack(fill="x", padx=10, pady=2)
         ttk.Label(focus_frame, text="Focus type:").grid(row=0, column=0, sticky="w", pady=1)
-        self.focus_type_combobox = ttk.Combobox(focus_frame, values=["SUM_OF_INTENSITY", "SUM_OF_LAPLACIAN", "SUM_OF_VARIANCE", "TENEGRAD", "SUM_OF_GRADIENT", "MEAN_ALL", "MEAN_LOG_ALL"], width=25)
+        self.focus_type_combobox = ttk.Combobox(focus_frame, values=["SUM_OF_INTENSITY", "SUM_OF_LAPLACIAN", "SUM_OF_VARIANCE", "TENEGRAD", "SUM_OF_GRADIENT", "MEAN_ARITH_ALL", "MEAN_GEO_ALL"], width=25)
         self.focus_type_combobox.grid(row=0, column=1, sticky="w", pady=1)
         self.focus_type_combobox.last_value = None
         
@@ -1103,7 +1108,7 @@ class HoloTrackerApp:
             context_menu.tk_popup(event.x_root, event.y_root)
             
         except Exception as e:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _is_in_test_mode(self):
         """Check if we're currently in TEST mode"""
@@ -1231,7 +1236,7 @@ class HoloTrackerApp:
                         self.colorbar = self.fig.colorbar(scatter, ax=self.ax, label='Particle Size (pixels)', shrink=0.8)
                 except Exception as e:
 
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
             else:
                 self.ax.scatter(x, y, z, c='red', marker='o', s=50)
             
@@ -1609,15 +1614,19 @@ STEP-BY-STEP PROCEDURE:
      (removes noise and debris stuck on optics - generally dirt or optical artifacts)
    
    FOCUS ANALYSIS:
-   • Choose focus metric from 8 available methods:
+   • Choose focus metric from 7 available methods:
      - SUM_OF_INTENSITY: Simple sum of pixel intensities (basic, fast)
      - SUM_OF_LAPLACIAN: Edge detection using Laplacian operator (good for sharp edges)
      - SUM_OF_VARIANCE: Statistical variance-based metric (robust to noise)
      - TENEGRAD: Gradient-based focus (recommended for most applications)
      - SUM_OF_GRADIENT: Sum of Sobel gradient magnitudes (edge-sensitive)
-     - MEAN_ALL: Arithmetic mean of 5 methods (SUM_OF_INTENSITY, SUM_OF_LAPLACIAN, SUM_OF_VARIANCE, TENEGRAD, SUM_OF_GRADIENT)
-     - MEAN_LOG_ALL: Geometric mean via logarithms of the same 5 methods (balanced combination)
-   • TENEGRAD and MEAN_LOG_ALL are recommended for most applications
+     - MEAN_ARITH_ALL: Arithmetic mean of the 5 methods above.
+       Careful: the 5 criteria have very different magnitudes, so the result
+       is dominated by the largest one, not by the most informative one.
+     - MEAN_GEO_ALL: Geometric mean of the same 5 methods, computed through
+       logarithms for numerical stability. Gives every criterion the same
+       relative weight: this is the balanced combination.
+   • TENEGRAD and MEAN_GEO_ALL are recommended for most applications
    • Higher threshold values = stricter particle detection
    • Lower threshold values = more sensitive detection
 
@@ -1694,8 +1703,10 @@ PARAMETER GUIDELINES:
   - SUM_OF_LAPLACIAN: Good for detecting sharp edges and boundaries
   - SUM_OF_VARIANCE: Robust to noise, good for uniform particles
   - SUM_OF_INTENSITY: Simple and fast, suitable for high-contrast particles
-  - MEAN_ALL: Balanced approach using arithmetic mean of 5 methods
-  - MEAN_LOG_ALL: Geometric mean combination, robust and recommended for complex samples
+  - MEAN_ARITH_ALL: Arithmetic mean of 5 methods; dominated by the criterion
+    with the largest magnitude, so MEAN_GEO_ALL is usually preferable
+  - MEAN_GEO_ALL: Geometric mean of the same 5 methods, balanced and robust,
+    recommended for complex samples
 
 TROUBLESHOOTING:
 
@@ -1818,8 +1829,10 @@ If this software has been useful for your research, please cite HoloTracker in y
             # For Z coordinate, use volume reconstruction step
             if hasattr(core, 'd_volume_module') and core.d_volume_module is not None:
                 step_um = float(self.parameters.get('step', 5e-7)) * 1e6  # Convert to µm
+                # Z est absolu (il inclut distance_ini): retirer l'offset pour le plan.
+                distance_ini_um = float(self.parameters.get('distance_ini', 0.0)) * 1e6
                 volume_shape = core.d_volume_module.shape  # (Z, Y, X)
-                pos_z_pix = int(pos_z_um / step_um)
+                pos_z_pix = int((pos_z_um - distance_ini_um) / step_um)
                 
                 # Clamp Z to valid range
                 pos_z_pix = max(0, min(pos_z_pix, volume_shape[0] - 1))
@@ -1922,7 +1935,7 @@ If this software has been useful for your research, please cite HoloTracker in y
             except ValueError as e:
                 tk.messagebox.showerror("Invalid Input", "Please enter valid positive integers")
             except tk.TclError as e:
-                pass
+                log.debug("exception ignorée", exc_info=True)
 
             except Exception as e:
 
@@ -2114,7 +2127,7 @@ If this software has been useful for your research, please cite HoloTracker in y
                                       foreground="red")
                 error_label.pack(pady=10)
             except:
-                pass
+                log.debug("exception ignorée", exc_info=True)
 
     def _open_focus_analysis_dialog(self, x_pos, y_pos):
         """Opens a dialog to configure and launch focus function analysis
@@ -2175,7 +2188,7 @@ If this software has been useful for your research, please cite HoloTracker in y
                 ttk.Label(comp_frame, text="Type:").grid(row=0, column=1, sticky=tk.W, padx=(10, 5))
                 focus_type_var = tk.StringVar(value="TENEGRAD")
                 focus_type_combo = ttk.Combobox(comp_frame, textvariable=focus_type_var, 
-                                              values=["SUM_OF_INTENSITY", "SUM_OF_LAPLACIAN", "SUM_OF_VARIANCE", "TENEGRAD", "SUM_OF_GRADIENT", "MEAN_ALL", "MEAN_LOG_ALL"],
+                                              values=["SUM_OF_INTENSITY", "SUM_OF_LAPLACIAN", "SUM_OF_VARIANCE", "TENEGRAD", "SUM_OF_GRADIENT", "MEAN_ARITH_ALL", "MEAN_GEO_ALL"],
                                               state="readonly", width=15)
                 focus_type_combo.grid(row=0, column=2, padx=5)
                 

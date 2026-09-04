@@ -36,7 +36,13 @@ import pandas as pd
 import math
 import json
 from datetime import datetime
-from . import processor
+try:
+    # Lancement en tant que module: python -m code_link.main_holotracker_link
+    from . import processor
+except ImportError:
+    # Lancement en tant que script: python code_link/main_holotracker_link.py
+    # (le répertoire du script est alors dans sys.path)
+    import processor
 try:
     import ttkbootstrap as ttkb
     from ttkbootstrap import Style
@@ -60,6 +66,15 @@ try:
 except Exception:
     tp = None
     TRACKPY_AVAILABLE = False
+
+# Journal: voir holo_log.py. Les exceptions ignorées y laissent une trace,
+# avec fichier, fonction et ligne, sans interrompre l'application.
+import logging
+log = logging.getLogger(__name__)
+
+# Le journal (holo_log.py) est à la racine du projet, un cran au-dessus de ce fichier.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from holo_log import setup_logging
 
 
 class CodeLinkGUI:
@@ -103,7 +118,7 @@ class CodeLinkGUI:
             self._load_params()
         except Exception:
             # ignore load errors and proceed with defaults
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
         # Thread pool for background tasks
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -121,7 +136,7 @@ class CodeLinkGUI:
         try:
             self.master.protocol('WM_DELETE_WINDOW', self._exit)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _create_layout(self):
         # Main panes: left controls, right plot
@@ -289,7 +304,7 @@ class CodeLinkGUI:
             self.status_lbl = ttk.Label(parent, textvariable=self.status_var, anchor='w')
             self.status_lbl.pack(fill=tk.X, padx=6, pady=(6,2))
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _build_plot_area(self, parent):
         # Create a matplotlib 3D axes and place it in the right frame
@@ -344,7 +359,7 @@ class CodeLinkGUI:
                 self.feature_path_text.delete(0, tk.END)
                 self.feature_path_text.insert(0, path)
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             self.status_var.set(f'Feature file: {os.path.basename(path)}')
 
     def _open_localisation_file(self):
@@ -365,9 +380,9 @@ class CodeLinkGUI:
                 self.feature_path_text.delete(0, tk.END)
                 self.feature_path_text.insert(0, path)
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
         self.open_loc_btn.state(['disabled'])
         self.link_btn.state(['disabled'])
@@ -440,10 +455,10 @@ class CodeLinkGUI:
                 try:
                     self.master.after_cancel(self._play_after_id)
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
                 self._play_after_id = None
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
         # get parameters
         try:
@@ -509,7 +524,7 @@ class CodeLinkGUI:
                     try:
                         self.ax.plot(gx, gy, [0]*len(gx), linewidth=1, color=col)
                     except Exception:
-                        pass
+                        log.debug("exception ignorée", exc_info=True)
 
             # keep global limits if available
             if hasattr(self, '_traj_xlim') and self._traj_xlim is not None:
@@ -520,17 +535,17 @@ class CodeLinkGUI:
                 try:
                     self.ax.autoscale()
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             # update status and redraw
             try:
                 self.status_var.set(f'Frames {st}..{end_frame}')
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             try:
                 self.canvas.draw()
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
 
             # advance to next start frame
             if st < self._play_state['max_start']:
@@ -556,10 +571,10 @@ class CodeLinkGUI:
                 try:
                     self.master.after_cancel(self._play_after_id)
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
                 self._play_after_id = None
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
         self.status_var.set('Play cancelled')
 
     def _save(self):
@@ -588,107 +603,18 @@ class CodeLinkGUI:
             messagebox.showerror('Read error', f'Could not read original file: {e}')
             return
 
-        # Build a robust mapping from original row index -> particle id
+        # La construction de la table de sortie est dans processor.build_trajectory_table:
+        # c'est elle qui decide quelle trajectoire va sur quelle ligne, et elle est testee.
         try:
-            traj = self.trajectories_df
-            if 'particle' not in traj.columns:
-                messagebox.showerror('Save error', 'Trajectories do not contain a particle column')
-                return
+            out, attribuees = processor.build_trajectory_table(orig, self.trajectories_df)
 
-            out = orig.copy()
-            nrows = len(out)
-            # initialize with -1 (no trajectory)
-            traj_nums = [-1] * nrows
-
-            # iterate through trajectories and map each row index to its particle id
-            for idx, pid in zip(traj.index, traj['particle']):
-                try:
-                    pos = int(idx)
-                except Exception:
-                    # if index cannot be interpreted as integer, skip
-                    continue
-                if 0 <= pos < nrows:
-                    try:
-                        traj_nums[pos] = int(pid)
-                    except Exception:
-                        traj_nums[pos] = -1
-
-            out['TRAJECTORY NUMBER'] = traj_nums
-
-            # Count how many were assigned; if too few, attempt a fallback match by (frame,x,y,z)
-            assigned = sum(1 for v in traj_nums if v != -1)
-            if assigned < max(10, int(0.5 * len(traj))):
-                # Attempt robust matching by key (frame, x, y, z) using rounding to avoid float noise
-                def pick_column(df, candidates):
-                    for c in candidates:
-                        if c in df.columns:
-                            return c
-                    return None
-
-                frame_col = pick_column(orig, ['HOLOGRAM NUMBER', 'frame', 'Frame', 'HOLOGRAM_NUMBER'])
-                x_col = pick_column(orig, ['X POSITION (m)', 'x', 'X_POSITION_(m)', 'X'])
-                y_col = pick_column(orig, ['Y POSITION (m)', 'y', 'Y_POSITION_(m)', 'Y'])
-                z_col = pick_column(orig, ['Z POSITION (m)', 'z', 'Z_POSITION_(m)', 'Z'])
-
-                if frame_col and x_col and y_col:
-                    # build mapping key -> list of positions
-                    orig_keys = {}
-                    for pos, row in orig.iterrows():
-                        try:
-                            f = int(row[frame_col])
-                        except Exception:
-                            continue
-                        try:
-                            xval = float(row[x_col])
-                        except Exception:
-                            xval = 0.0
-                        try:
-                            yval = float(row[y_col])
-                        except Exception:
-                            yval = 0.0
-                        try:
-                            zval = float(row[z_col]) if z_col and z_col in row else 0.0
-                        except Exception:
-                            zval = 0.0
-                        key = (f, round(xval, 9), round(yval, 9), round(zval, 9))
-                        orig_keys.setdefault(key, []).append(pos)
-
-                    # assign from trajectories by matching keys
-                    traj_nums2 = [-1] * nrows
-                    used = 0
-                    for _, r in traj.iterrows():
-                        try:
-                            f = int(r.get('frame', r.get('Frame', None)))
-                        except Exception:
-                            continue
-                        xval = float(r.get('x', 0.0)) if not pd.isna(r.get('x', 0.0)) else 0.0
-                        yval = float(r.get('y', 0.0)) if not pd.isna(r.get('y', 0.0)) else 0.0
-                        zval = float(r.get('z', 0.0)) if not pd.isna(r.get('z', 0.0)) else 0.0
-                        key = (f, round(xval, 9), round(yval, 9), round(zval, 9))
-                        lst = orig_keys.get(key)
-                        if lst and len(lst) > 0:
-                            pos = lst.pop(0)
-                            try:
-                                traj_nums2[pos] = int(r['particle'])
-                                used += 1
-                            except Exception:
-                                traj_nums2[pos] = -1
-
-                    # prefer fallback mapping if it assigned more
-                    if used > assigned:
-                        out['TRAJECTORY NUMBER'] = traj_nums2
-                        assigned = used
-
-            # Remove original OBJECT NUMBER if present
-            if 'OBJECT NUMBER' in out.columns:
-                out.drop(columns=['OBJECT NUMBER'], inplace=True)
-
-            # Build output filename
             dt = datetime.now().strftime('%Y%m%d_%H%M%S')
             out_path = os.path.join(os.path.dirname(path), f'TRAJECTORIES_{dt}.csv')
             out.to_csv(out_path, index=False)
+
             messagebox.showinfo('Saved', f'Trajectories saved to: {out_path}')
-            self.status_var.set(f'Saved trajectories to {os.path.basename(out_path)}')
+            self.status_var.set(
+                f'Saved {attribuees}/{len(out)} rows to {os.path.basename(out_path)}')
         except Exception as e:
             messagebox.showerror('Save error', f'Error saving trajectories: {e}')
 
@@ -969,12 +895,12 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         try:
             self.executor.shutdown(wait=False)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
         # Save params before quitting
         try:
             self._save_params()
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
         self.master.quit()
 
     def _load_params(self):
@@ -992,7 +918,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     self.feature_path_text.delete(0, tk.END)
                     self.feature_path_text.insert(0, fp)
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             mem = data.get('memory')
             if mem is not None:
@@ -1000,7 +926,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     self.memory_spin.delete(0, tk.END)
                     self.memory_spin.insert(0, str(mem))
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             minlength = data.get('minlength')
             if minlength is not None:
@@ -1008,7 +934,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     self.minlength_spin.delete(0, tk.END)
                     self.minlength_spin.insert(0, str(minlength))
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             for axis in ('x_range', 'y_range', 'z_range'):
                 v = data.get(axis)
@@ -1017,7 +943,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                         getattr(self, f'{axis}_entry').delete(0, tk.END)
                         getattr(self, f'{axis}_entry').insert(0, str(v))
                     except Exception:
-                        pass
+                        log.debug("exception ignorée", exc_info=True)
 
             history = data.get('history')
             if history is not None:
@@ -1025,7 +951,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     self.history_spin.delete(0, tk.END)
                     self.history_spin.insert(0, str(history))
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             step = data.get('step')
             if step is not None:
@@ -1033,10 +959,10 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     self.step_spin.delete(0, tk.END)
                     self.step_spin.insert(0, str(step))
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
         except Exception:
             # don't fail loading on any per-field error
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _save_params(self):
         """Save selected parameters to last_params_link.json"""
@@ -1083,7 +1009,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                 json.dump(data, fh, indent=2)
         except Exception:
             # ignore save errors
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     # --- Background task handlers ---
     def _process_cb_queue(self):
@@ -1103,7 +1029,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                         try:
                             self.open_loc_btn.state(['!disabled'])
                         except Exception:
-                            pass
+                            log.debug("exception ignorée", exc_info=True)
                 elif item[0] == 'link_done':
                     future = item[1]
                     try:
@@ -1115,15 +1041,23 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                         try:
                             self.link_btn.state(['!disabled'])
                         except Exception:
-                            pass
+                            log.debug("exception ignorée", exc_info=True)
                 self._cb_queue.task_done()
         except queue.Empty:
-            pass
+            log.debug("exception ignorée", exc_info=True)
         finally:
             self.master.after(100, self._process_cb_queue)
 
     def _on_file_loaded(self, df):
         self.loaded_df = df
+        if len(df) == 0:
+            # Peut arriver si le fichier ne contenait que des lignes 'aucun objet détecté'
+            messagebox.showwarning(
+                'No detection',
+                'This localisation file contains no detected object.\n'
+                'Nothing to link: check the detection threshold used in HoloTracker Locate.')
+            self.status_var.set('Loaded file contains no detection')
+            return
         # update counters
         holo_ids = sorted(df['frame'].unique())
         total_holo = len(holo_ids)
@@ -1136,7 +1070,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
             try:
                 self.feature_holo_scale.configure(from_=min_frame, to=max_frame)
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             # set to first available
             try:
                 self.feature_holo_scale.set(min_frame)
@@ -1144,16 +1078,16 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                 try:
                     self.feature_index_var.set(str(min_frame))
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             self._plot_hologram(min_frame)
         self.status_var.set('Load complete')
         # enable LINK
         try:
             self.link_btn.state(['!disabled'])
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _on_hologram_spin(self):
         # kept for compatibility with older bindings
@@ -1161,7 +1095,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
             val = int(self.feature_holo_scale.get())
             self._plot_hologram(val)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _on_hologram_scale(self, value):
         try:
@@ -1170,10 +1104,10 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
             try:
                 self.feature_index_var.set(str(val))
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             self._plot_hologram(val)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _on_trajectory_spin(self):
         """Callback when trajectory spinbox changes: show only selected trajectory if linking was performed."""
@@ -1193,7 +1127,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                     # fallback: try treat val as pid
                     self._plot_trajectory(val)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _on_trajectory_scale(self, value):
         try:
@@ -1202,7 +1136,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
             try:
                 self.trajectory_index_var.set(str(v))
             except Exception:
-                pass
+                log.debug("exception ignorée", exc_info=True)
             if v == 0:
                 self._plot_all_trajectories()
             else:
@@ -1212,7 +1146,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                 else:
                     self._plot_trajectory(v)
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _plot_all_trajectories(self):
         """Plot all trajectories using stored global limits if available."""
@@ -1265,7 +1199,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
 
             self.canvas.draw()
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _plot_trajectory(self, particle_id):
         """Plot only the trajectory with given particle id (particle ids from trackpy)."""
@@ -1279,7 +1213,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         try:
             self.status_var.set(f'Trajectory {particle_id}: {n} points')
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
         # Clear axes and labels
         self.ax.clear()
@@ -1332,7 +1266,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                 try:
                     self.ax.plot(xs, ys, zs if len(zs) == len(xs) else [0] * len(xs), linewidth=0.8, color=col)
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
         else:
             # no points: set a default view
             self.ax.set_xlim(0, 200)
@@ -1342,7 +1276,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         try:
             self.canvas.draw()
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _plot_hologram(self, frame_idx):
         if self.loaded_df is None:
@@ -1354,11 +1288,11 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         try:
             self.status_var.set(f'Frame {frame_idx}: {n} objects')
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
         try:
             print(f'[CodeLink] Plotting frame {frame_idx}: {n} objects')
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
         # Clear axes and labels
         self.ax.clear()
@@ -1408,7 +1342,7 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
                 try:
                     self.ax.scatter(xs, ys, [0]*len(xs), c='r', s=10)
                 except Exception:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
         else:
             # no points: set a default view
             self.ax.set_xlim(0, 200)
@@ -1419,27 +1353,16 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         try:
             self.canvas.draw()
         except Exception:
-            pass
+            log.debug("exception ignorée", exc_info=True)
 
     def _do_link(self, df, search_range_m, memory, minlength=0):
         # Delegate linking to processor.link_df which links the entire dataframe
         # NOTE: search_range_m is a tuple in meters (x_range, y_range, z_range)
-        try:
-            from code_link import processor
-        except Exception:
-            # fallback to local trackpy if processor import fails
-            processor = None
-
-        if processor is not None:
-            # processor.link_df expects df with frame,x,y,(z) in meters
-            return processor.link_df(df, search_range_m, memory, minlength=minlength)
-
-        # Fallback: call trackpy directly
-        df_tp = df[['frame', 'x', 'y', 'z']].copy()
-        df_tp.rename(columns={'frame': 'frame', 'x': 'x', 'y': 'y'}, inplace=True)
-        # tp.link_df expects the search radius in the same units as the x,y columns (meters here)
-        trajectories = tp.link_df(df_tp, search_range_m, memory=memory)
-        return trajectories
+        # `processor` est importé au niveau module (voir en tête de fichier), quel que soit
+        # le mode de lancement. L'ancien repli "trackpy direct" a été supprimé: il liait
+        # les données avec un algorithme différent, sans que l'utilisateur en soit informé.
+        # processor.link_df expects df with frame,x,y,(z) in meters
+        return processor.link_df(df, search_range_m, memory, minlength=minlength)
 
     def _on_link_complete(self, traj_df):
         self.trajectories_df = traj_df
@@ -1449,6 +1372,28 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
         self.status_var.set(f'Link complete - {n_traj} trajectories')
         # Re-enable LINK
         self.link_btn.state(['!disabled'])
+
+        if n_traj == 0:
+            # Cas le plus fréquent: min length supérieur au nombre d'images du film,
+            # donc aucune trajectoire ne peut l'atteindre. Le signaler explicitement
+            # plutôt que d'afficher un graphe vide.
+            n_frames = self.loaded_df['frame'].nunique() if self.loaded_df is not None else 0
+            try:
+                minlength = int(self.minlength_spin.get())
+            except Exception:
+                minlength = 0
+            if minlength > n_frames:
+                detail = (f'Min length is set to {minlength} while the movie only has '
+                          f'{n_frames} holograms: no trajectory can ever be that long.\n'
+                          f'Lower Min length below {n_frames}.')
+            elif minlength > 0:
+                detail = (f'No trajectory reached {minlength} points.\n'
+                          f'Lower Min length, or increase the search range so that '
+                          f'detections get linked across more frames.')
+            else:
+                detail = 'Increase the search range, or check the input file.'
+            messagebox.showwarning('No trajectory', f'No trajectory survived linking.\n\n{detail}')
+            self.status_var.set('Link complete - no trajectory kept')
 
         # Configure trajectory scale range and mapping: 0 => all, 1..N map to sorted particle ids
         if 'particle' in traj_df.columns and n_traj > 0:
@@ -1485,6 +1430,9 @@ This software builds upon the excellent Trackpy library developed by the soft-ma
 
 
 if __name__ == '__main__':
+    # Journal: les exceptions ignorées y laissent une trace, sans interrompre l'application.
+    setup_logging("HoloTracker Link")
+
     root = tk.Tk()
     app = CodeLinkGUI(root)
     root.mainloop()

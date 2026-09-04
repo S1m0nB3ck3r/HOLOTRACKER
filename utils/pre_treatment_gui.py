@@ -428,46 +428,19 @@ class PreTreatmentGUI(tk.Tk):
                        f"Cleaning: {i + 1}/{n} ({pct:.0f} %)")
 
     def _compute_mean_progress(self, image_paths, mean_type, n):
+        """Moyenne des images, avec la barre de progression (0 -> 50 %).
+
+        Le calcul lui-meme est celui de pre_treatment.compute_mean_image: cette methode
+        ne fait que lui fournir un rappel de progression. Elle en recopiait auparavant
+        tout l'algorithme, ce qui faisait deux versions a maintenir en parallele.
         """
-        Compute the mean image with progress bar updates (0 → 50 %).
-        Simultaneously accumulates per-pixel min_map and max_map to allow
-        the exact analytical computation of normalization bounds.
-        Returns (mean, min_map, max_map).
-        """
-        import numpy as np
-
-        mean_type = mean_type.lower()
-        first = pre_treatment.read_image_float32(image_paths[0]).astype(np.float64)
-        accumulator = np.zeros_like(first, dtype=np.float64)
-        min_map = np.full_like(first, fill_value=np.inf,  dtype=np.float64)
-        max_map = np.full_like(first, fill_value=-np.inf, dtype=np.float64)
-
-        for i, path in enumerate(image_paths):
-            img = pre_treatment.read_image_float32(path).astype(np.float64)
-
-            # Per-pixel maps on raw images
-            np.minimum(min_map, img, out=min_map)
-            np.maximum(max_map, img, out=max_map)
-
-            if mean_type == "log":
-                eps = np.finfo(np.float32).tiny
-                np.clip(img, eps, None, out=img)
-                accumulator += np.log(img)
-            else:
-                accumulator += img
-
-            pct = 50 * (i + 1) / n
+        def progression(i, total):
+            pct = 50 * i / total
             self.after(0, self._update_progress, pct,
-                       f"Mean: {i + 1}/{n} ({pct:.0f} %)")
+                       f"Mean: {i}/{total} ({pct:.0f} %)")
 
-        mean = accumulator / n
-        if mean_type == "log":
-            mean = np.exp(mean)
-        return (
-            mean.astype(np.float32),
-            min_map.astype(np.float32),
-            max_map.astype(np.float32),
-        )
+        return pre_treatment.compute_mean_image(image_paths, mean_type,
+                                                progress_callback=progression)
 
     # ------------------------------------------------------------------ #
     #  GUI callbacks (called via self.after from the worker thread)

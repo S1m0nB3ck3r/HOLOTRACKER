@@ -10,6 +10,12 @@ try:
 except ImportError:
     cp = None
 from core_communicator import CoreCommunicator, CommandType
+import display
+
+# Journal: voir holo_log.py. Les exceptions ignorées y laissent une trace,
+# avec fichier, fonction et ligne, sans interrompre l'application.
+import logging
+log = logging.getLogger(__name__)
 
 class HoloTrackerController:
     def __init__(self, app_ui, core):
@@ -81,7 +87,7 @@ class HoloTrackerController:
                 self.handle_core_result(result)
         except Exception as e:
             # print(f" Error checking core results: {e}")
-            pass
+            log.debug("exception ignorée", exc_info=True)
         finally:
             # Schedule next check
             if self.running or self.core_comm.running:
@@ -92,7 +98,14 @@ class HoloTrackerController:
         # print(f"📥 Received result: {result.command_type.value} - Success: {result.success}")
         
         if not result.success:
-            self.update_status(f"Error: {result.error}")
+            # is_error=True: le message reste affiché et n'est pas écrasé par le
+            # commentaire de progression suivant.
+            self.update_status(f"Error: {result.error}", is_error=True)
+            if result.data.get('batch_aborted'):
+                # Le Core a vidé la file et quitté le mode batch: remettre l'IHM
+                # dans un état cohérent, sinon seul STOP BATCH reste actif.
+                self.set_state("WAIT")
+                self.ui.on_batch_mode_exited()
             return
         
         if result.command_type == CommandType.ENTER_TEST_MODE:
@@ -126,7 +139,7 @@ class HoloTrackerController:
 
                 except Exception as e:
 
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
             else:
                 # Just allocation (no hologram selected)
                 self.update_status("Test mode activated - Allocation completed, select hologram")
@@ -141,7 +154,7 @@ class HoloTrackerController:
 
                     except Exception as e:
 
-                        pass
+                        log.debug("exception ignorée", exc_info=True)
             
         elif result.command_type == CommandType.PROCESS_HOLOGRAM:
             # Display results and timing with robust error handling
@@ -151,7 +164,7 @@ class HoloTrackerController:
 
             except Exception as e:
 
-                pass
+                log.debug("exception ignorée", exc_info=True)
             
             # processing_times are already in result.data, so no need for separate call
             # but we can make explicit call to ensure timing display
@@ -162,7 +175,7 @@ class HoloTrackerController:
 
             except Exception as e:
 
-                pass
+                log.debug("exception ignorée", exc_info=True)
             
             # Afficher l'image
             directory = result.data.get('directory', '')
@@ -172,7 +185,7 @@ class HoloTrackerController:
                     display_type = self.ui.display_combobox.get()
                     plane_number = int(self.ui.plane_number_spinbox.get()) if self.ui.plane_number_spinbox.get() else 0
                     additional_display = self._get_current_additional_display()
-                    result_image = self.core.get_display_image(directory, filename, display_type, plane_number, additional_display)
+                    result_image = display.get_display_image(self.core, directory, filename, display_type, plane_number, additional_display)
                     
                     # Store current display info
                     self.current_display_info = {
@@ -187,7 +200,7 @@ class HoloTrackerController:
 
                 except Exception as e:
 
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
             
             num_objects = result.data.get('count', 0)
             self.last_object_count = num_objects  # Store for future parameter updates
@@ -228,7 +241,7 @@ class HoloTrackerController:
                 try:
                     self.ui.display_results(result.data)
                 except Exception as e:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
                 
                 # Update timing display
                 try:
@@ -236,7 +249,7 @@ class HoloTrackerController:
                         timing_data = {'processing_times': result.processing_times}
                         self.ui.update_timing_display(timing_data)
                 except Exception as e:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
                 
                 num_objects = result.data.get('count', 0)
                 self.last_object_count = num_objects  # Store for future parameter updates
@@ -265,7 +278,7 @@ class HoloTrackerController:
                     plane_number = int(self.ui.plane_number_spinbox.get()) if self.ui.plane_number_spinbox.get() else 0
                     additional_display = self._get_current_additional_display()
                     use_log = self.ui.display_log_var.get()
-                    result_image = self.core.get_display_image(directory, filename, display_type, plane_number, additional_display, use_log=use_log)
+                    result_image = display.get_display_image(self.core, directory, filename, display_type, plane_number, additional_display, use_log=use_log)
                     
                     # Store current display info
                     self.current_display_info = {
@@ -279,7 +292,7 @@ class HoloTrackerController:
                     
                     self.ui.display_hologram_image(result_image)
                 except Exception as e:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
                 
         elif result.command_type == CommandType.EXIT_TEST_MODE:
             self.set_state("WAIT")
@@ -343,7 +356,7 @@ class HoloTrackerController:
                             pass
 
                 except Exception as e:
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
 
             # Si pas trouvé, essayer les noms de variables directement
             if not display_checked:
@@ -359,7 +372,7 @@ class HoloTrackerController:
 
                                     break
                         except:
-                            pass
+                            log.debug("exception ignorée", exc_info=True)
 
             # TOUJOURS mettre à jour les temps d'exécution en mode BATCH
             if 'processing_times' in result.data and self.last_iteration_time:
@@ -616,7 +629,11 @@ class HoloTrackerController:
             self.core_comm.send_command(CommandType.ALLOCATE, {'parameters': self.ui.parameters})
             
             # 3. Chargement hologramme moyen
-            self.core_comm.send_command(CommandType.LOAD_MEAN_HOLO, {'parameters': self.ui.parameters})
+            # L'hologramme moyen n'est chargé que s'il sert: sinon son chemin peut être vide,
+            # la commande échoue pour rien et laisse une erreur affichée alors que le
+            # traitement se déroulera correctement.
+            if self.ui.parameters.get('remove_mean'):
+                self.core_comm.send_command(CommandType.LOAD_MEAN_HOLO, {'parameters': self.ui.parameters})
             
             # 4. Traitement (si hologramme disponible)
             if directory and filename:
@@ -682,7 +699,7 @@ class HoloTrackerController:
                     }
                     
                     # Update image display immediately
-                    result_image = self.core.get_display_image(directory, filename, display_type, plane_number, additional_display, use_log=use_log)
+                    result_image = display.get_display_image(self.core, directory, filename, display_type, plane_number, additional_display, use_log=use_log)
                     self.ui.display_hologram_image(result_image)
                     log_text = " (LOG)" if use_log else ""
                     self.update_status(f"Display updated to {display_type}{log_text} - Plane {plane_number} - Additional: {additional_display}")
@@ -703,7 +720,7 @@ class HoloTrackerController:
             
             # Get pixel value from core
             try:
-                pixel_value = self.core.get_pixel_value(directory, filename, display_type, plane_number, x, y)
+                pixel_value = display.get_pixel_value(self.core, directory, filename, display_type, plane_number, x, y)
                 
                 # Convert to physical coordinates
                 physical_coords = self._get_physical_coordinates(x, y, display_type)
@@ -809,11 +826,18 @@ class HoloTrackerController:
                 self.ui.display_combobox.set("CLEANED_HOLOGRAM")
             else:
                 self.ui.display_combobox.set("RAW_HOLOGRAM")
-        
-        # Envoyer TOUTES les commandes dans la FIFO
-        self._send_batch_commands_to_fifo(batch_directory, files, display_enabled)
-        
-        self.update_status(f"Batch started: {len(files)} files queued")
+
+            # Envoyer TOUTES les commandes dans la FIFO
+            # Cet appel était en dehors du bloc 'if': hors de l'état WAIT, 'files' et
+            # 'display_enabled' n'étaient jamais créées et Python levait un
+            # UnboundLocalError. Le bouton START BATCH est grisé hors WAIT, mais la
+            # branche par défaut de update_buttons_state réactive tous les boutons pour
+            # un état inattendu, ce qui rendait le chemin atteignable.
+            self._send_batch_commands_to_fifo(batch_directory, files, display_enabled)
+
+            self.update_status(f"Batch started: {len(files)} files queued")
+        else:
+            self.update_status(f"Cannot start batch while in state {self.state}", is_error=True)
 
     def _send_batch_commands_to_fifo(self, directory, files, display_results):
         """Send all batch commands to FIFO at once"""
@@ -835,7 +859,11 @@ class HoloTrackerController:
         self.core_comm.send_command(CommandType.ALLOCATE, {'parameters': self.ui.parameters})
         
         # 3. Chargement hologramme moyen
-        self.core_comm.send_command(CommandType.LOAD_MEAN_HOLO, {'parameters': self.ui.parameters})
+        # L'hologramme moyen n'est chargé que s'il sert: sinon son chemin peut être vide,
+        # la commande échoue pour rien et laisse une erreur affichée alors que le
+        # traitement se déroulera correctement.
+        if self.ui.parameters.get('remove_mean'):
+            self.core_comm.send_command(CommandType.LOAD_MEAN_HOLO, {'parameters': self.ui.parameters})
         
         # 4. Traitement de chaque fichier (plus de display_results dans FIFO)
         for filename in files:
@@ -874,7 +902,7 @@ class HoloTrackerController:
                 # (which uses self.results) draws centroids consistent with the shown CSV/3D plot.
                 prev_results = getattr(self.core, 'results', None)
                 try:
-                    # Build a minimal results dict expected by core.get_display_image overlays
+                    # Build a minimal results dict expected by display.get_display_image overlays
                     temp_results = {
                         'number_of_objects': result_data.get('count', 0),
                         'features': result_data.get('features', None),
@@ -882,7 +910,7 @@ class HoloTrackerController:
                     }
                     self.core.results = temp_results
 
-                    result_image = self.core.get_display_image(directory, filename, display_type, plane_number, additional_display)
+                    result_image = display.get_display_image(self.core, directory, filename, display_type, plane_number, additional_display)
 
                     # Store current display info
                     self.current_display_info = {

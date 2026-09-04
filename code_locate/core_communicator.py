@@ -10,6 +10,12 @@ import time
 from enum import Enum
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Callable
+import display
+
+# Journal: voir holo_log.py. Les exceptions ignorées y laissent une trace,
+# avec fichier, fonction et ligne, sans interrompre l'application.
+import logging
+log = logging.getLogger(__name__)
 
 class CommandType(Enum):
     """Types de commandes pour le Core"""
@@ -58,6 +64,12 @@ class CoreCommunicator:
         # Variables d'état
         self.current_state = "IDLE"
         self.allocation_needed = False
+
+        # Arrêt automatique d'un lot qui échoue en série (voir _process_command).
+        # Sans cela, une panne systématique (mémoire GPU, image illisible, dimensions
+        # incohérentes) laisse le lot se dérouler jusqu'au bout sans rien produire.
+        self.batch_consecutive_failures = 0
+        self.MAX_BATCH_CONSECUTIVE_FAILURES = 3
     
     def start(self):
         """Démarre le thread de communication avec le Core"""
@@ -103,7 +115,7 @@ class CoreCommunicator:
                     callback(result)
                 except Exception as e:
                     # print(f" Callback error: {e}")
-                    pass
+                    log.debug("exception ignorée", exc_info=True)
             
             return result
         except queue.Empty:
@@ -153,6 +165,28 @@ class CoreCommunicator:
     
     def _process_command(self, command: Command) -> Result:
         """Traite une commande et retourne le résultat"""
+        result = self._dispatch_command(command)
+
+        # Surveillance des échecs en série pendant un lot
+        if command.type == CommandType.PROCESS_HOLOGRAM_BATCH:
+            if result.success:
+                self.batch_consecutive_failures = 0
+            else:
+                self.batch_consecutive_failures += 1
+                if self.batch_consecutive_failures >= self.MAX_BATCH_CONSECUTIVE_FAILURES:
+                    remaining = self.clear_command_queue()
+                    self.core.exit_batch_mode()
+                    self.current_state = "IDLE"
+                    self.batch_consecutive_failures = 0
+                    result.error = (
+                        f"{result.error} - batch aborted after "
+                        f"{self.MAX_BATCH_CONSECUTIVE_FAILURES} consecutive failures "
+                        f"({remaining} hologram(s) cancelled)")
+                    result.data['batch_aborted'] = True
+        return result
+
+    def _dispatch_command(self, command: Command) -> Result:
+        """Aiguillage d'une commande vers son handler"""
         try:
             if command.type == CommandType.ALLOCATE:
                 return self._handle_allocate(command)
@@ -352,12 +386,13 @@ class CoreCommunicator:
                     csv_written = True
                     # print(f"📄 CSV written: #{self.batch_hologram_counter} - {filename} - {len(features)} objects")
                 else:
-                    # Pas d'objets détectés, écrire une ligne avec des valeurs par défaut
-                    with open(self.batch_csv_path, 'a', newline='', encoding='utf-8') as f:
-                        f.write(f"{self.batch_hologram_counter},0,0.00000000e+00,0.00000000e+00,0.00000000e+00,0\n")
-                    
-                    csv_written = True
-                    # print(f"📄 CSV written: #{self.batch_hologram_counter} - {filename} - No objects detected")
+                    # Pas d'objets détectés: ne RIEN écrire.
+                    # Une ligne à (0,0,0) serait relue par HoloTracker Link comme une vraie
+                    # détection et produirait une trajectoire fantôme immobile à l'origine.
+                    # Le numéro d'hologramme reste porté par la colonne HOLOGRAM NUMBER:
+                    # les images sans objet apparaissent simplement comme des frames absentes.
+                    csv_written = False
+                    # print(f"📄 No objects detected: #{self.batch_hologram_counter} - {filename} - nothing written")
                 
                 # Ajouter info batch au résultat
                 results_data['batch_info'] = {
@@ -575,7 +610,7 @@ class CoreCommunicator:
             display_in_dialog = data.get('display_in_dialog', False)
             
             # Get slices from core
-            slices_data = self.core.extract_object_slices(position[0], position[1], position[2], vox_xy, vox_z)
+            slices_data = display.extract_object_slices(self.core, position[0], position[1], position[2], vox_xy, vox_z)
             
             return Result(
                 command_type=CommandType.EXTRACT_OBJECT_SLICES,

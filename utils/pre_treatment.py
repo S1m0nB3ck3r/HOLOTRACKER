@@ -21,8 +21,16 @@ python pre_treatment.py --dir_in PATH_IN --dir_out PATH_OUT
 """
 
 import os
+import sys
 import argparse
 import numpy as np
+
+# Le calcul de la moyenne est partage avec HoloTracker Locate: une seule implementation
+# pour tout le projet. code_locate/ n'est pas un paquet installable, on l'ajoute au chemin
+# comme le font holo_log.py et les tests.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "code_locate"))
+import traitement_holo
 from PIL import Image
 
 
@@ -66,61 +74,43 @@ def save_image_tiff(array: np.ndarray, path: str) -> None:
 def compute_mean_image(
     image_paths: list[str],
     mean_type: str,
+    progress_callback=None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Compute the mean image and per-pixel min/max maps over all raw images.
 
-    mean_type="arithmetic" : classical mean  → mean(I_i)
-    mean_type="log"        : geometric mean  → exp(mean(log(I_i)))
-                             Zero or negative pixels are replaced by a small
-                             epsilon value before taking the log.
+    mean_type="arithmetic" : classical mean      -> mean(I_i)
+    mean_type="log"        : geometric mean      -> exp(mean(log(I_i)))
+
+    progress_callback : callable(i, n), called after each image.
 
     Returns
     -------
-    mean    : np.ndarray  – mean image (float32)
-    min_map : np.ndarray  – per-pixel minimum over all raw images
-    max_map : np.ndarray  – per-pixel maximum over all raw images
+    mean    : np.ndarray  - mean image (float32)
+    min_map : np.ndarray  - per-pixel minimum over all raw images
+    max_map : np.ndarray  - per-pixel maximum over all raw images
 
     These two maps allow the exact extrema of the cleaned images to be derived
     analytically without any additional pass over the data.
+
+    Thin wrapper: the computation itself lives in code_locate/traitement_holo.py, which is
+    the single mean implementation of the whole project. Three copies used to coexist (the
+    Locate button, the standalone script, this module) and differed only in peripheral
+    details, now arguments.
     """
-    mean_type = mean_type.lower()
-    if mean_type not in ("arithmetic", "log"):
+    if mean_type.lower() not in ("arithmetic", "log"):
         raise ValueError(f"Invalid mean_type: '{mean_type}'. Use 'arithmetic' or 'log'.")
 
-    n = len(image_paths)
-    # Initialise from first image to get array shape
-    first = read_image_float32(image_paths[0])
-    accumulator = np.zeros_like(first, dtype=np.float64)
-    min_map = np.full_like(first, fill_value=np.inf,  dtype=np.float64)
-    max_map = np.full_like(first, fill_value=-np.inf, dtype=np.float64)
+    print(f"Computing mean image ({mean_type}) over {len(image_paths)} images...")
+    if progress_callback is None:
+        n = len(image_paths)
 
-    print(f"Computing mean image ({mean_type}) over {n} images...")
+        def progress_callback(i, total):
+            if i % max(1, total // 10) == 0 or i == total:
+                print(f"  {i}/{total} images processed ({100 * i / total:.0f} %)")
 
-    for i, path in enumerate(image_paths):
-        img = read_image_float32(path).astype(np.float64)
-
-        # Update per-pixel maps on raw images (before log)
-        np.minimum(min_map, img, out=min_map)
-        np.maximum(max_map, img, out=max_map)
-
-        if mean_type == "log":
-            # Replace values <= 0 with epsilon before log
-            eps = np.finfo(np.float32).tiny
-            np.clip(img, eps, None, out=img)
-            accumulator += np.log(img)
-        else:
-            accumulator += img
-
-        if (i + 1) % max(1, n // 10) == 0 or (i + 1) == n:
-            print(f"  {i + 1}/{n} images processed ({100 * (i + 1) / n:.0f} %)")
-
-    mean = accumulator / n
-
-    if mean_type == "log":
-        mean = np.exp(mean)
-
-    return mean.astype(np.float32), min_map.astype(np.float32), max_map.astype(np.float32)
+    return traitement_holo.calc_holo_moyen(
+        image_paths, type_moyenne=mean_type, progress_callback=progress_callback)
 
 
 # ---------------------------------------------------------------------------

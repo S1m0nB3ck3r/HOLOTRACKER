@@ -52,10 +52,11 @@ def d_filter_FFT(d_plan_IN, d_plan_OUT, sizeX, sizeY, dMin, dMax):
     ### d_plan_IN et d_plan_OUT des plans complex sur GPU de taille sizeX et sizeY 
 
     index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    sizeXY = sizeX * sizeY
 
+    # ii = index - jj * sizeX. sizeY figurait ici: exact tant que l'image est carree,
+    # faux des que sizeX != sizeY.
     jj = cp.int32(index) // cp.int32(sizeX)
-    ii = cp.int32(index) - cp.int32(jj * sizeY)
+    ii = cp.int32(index) - cp.int32(jj * sizeX)
 
     if (ii < sizeX and jj < sizeY):
         #calc distance
@@ -73,10 +74,10 @@ def d_filter_FFT(d_plan_IN, d_plan_OUT, sizeX, sizeY, dMin, dMax):
 def d_spec_filter_FFT(d_plan_IN, d_plan_OUT, sizeX, sizeY, dMin, dMax):
 
     index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    sizeXY = sizeX * sizeY
 
+    # ii = index - jj * sizeX (voir d_filter_FFT ci-dessus).
     jj = cp.int32(index) // cp.int32(sizeX)
-    ii = cp.int32(index) - cp.int32(jj * sizeY)
+    ii = cp.int32(index) - cp.int32(jj * sizeX)
 
     if (ii < sizeX and jj < sizeY):
         #calc distance
@@ -121,8 +122,10 @@ def d_calc_kernel_propag_Rayleigh_Sommerfeld(d_KERNEL, lambda_milieu, magnificat
         Y = cp.float32( cp.int32(jj) - cp.int32(nb_pix_Y // 2) )
         dpix = cp.float32(pixSize / magnification)
         mod = cp.float32(distance) / cp.float32(lambda_milieu * (distance * distance + X * X *dpix * dpix + Y * Y * dpix*dpix))
+        # phase contient deja K = 2*pi/lambda: le facteur exp(2j*pi*phase) qui figurait
+        # ici appliquait donc 2*pi une seconde fois.
         phase = cp.float32(K * cp.sqrt(distance * distance + X * X * dpix * dpix + Y * Y * dpix * dpix))
-        d_KERNEL[jj, ii] = cp.complex64(mod * cp.exp(2.0j*cp.pi*phase))
+        d_KERNEL[jj, ii] = cp.complex64(mod * cp.exp(1.0j*phase))
 
     
 @jit.rawkernel()
@@ -204,15 +207,23 @@ lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance, f_pix_min, 
     ### dx et dy ne dépendent pas de la distance de propagation
     
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
-    d_FFT_HOLO = fftshift(fft2(d_HOLO, norm = 'ortho'))
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
+    # Affectations en place '[:]': les tampons sont fournis par l'appelant. Ecrire
+    # 'd_FFT_HOLO = ...' ne faisait que reaffecter la variable locale, l'appelant ne
+    # voyait rien (sequelle des signatures C/CUDA d'origine).
+    d_FFT_HOLO[:] = fftshift(fft2(d_HOLO, norm = 'ortho'))
 
     if ((f_pix_min != 0) or (f_pix_max != 0)):
-        d_filter_FFT(d_FFT_HOLO, d_FFT_HOLO, nb_pix_X, nb_pix_Y, f_pix_min, f_pix_max)
+        # La configuration de lancement [nBlock, nthread] manquait: l'appel levait un
+        # TypeError des que le filtrage etait demande.
+        d_filter_FFT[nBlock, nthread](d_FFT_HOLO, d_FFT_HOLO, nb_pix_X, nb_pix_Y, f_pix_min, f_pix_max)
 
     d_calc_kernel_angular_spectrum_jit[nBlock, nthread](d_KERNEL, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
-    d_FFT_HOLO_PROPAG = d_FFT_HOLO * d_KERNEL
-    d_HOLO_PROPAG = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
+    d_FFT_HOLO_PROPAG[:] = d_FFT_HOLO * d_KERNEL
+    d_HOLO_PROPAG[:] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
     return(d_HOLO_PROPAG)
 
 def propag_fresnell(d_HOLO, d_HOLO_2, d_FFT, d_HOLO_PROPAG,
@@ -223,7 +234,10 @@ lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance):
     ### méthode pas encore testée...un peu merdique
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
     d_propag_fresnel_phase1_jit[nBlock, nthread](d_HOLO, d_HOLO_2, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
     d_FFT = fftshift(fft2(d_HOLO_2))
     d_propag_fresnel_phase2_jit[nBlock, nthread](d_FFT, d_HOLO_PROPAG, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
@@ -235,12 +249,17 @@ lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance):
     ### dx et dy ne dépendent pas de la distance de propagation
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
-    d_FFT_HOLO = fftshift(fft2(d_HOLO, norm = 'ortho'))
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
+    # Affectations en place (voir propag_angular_spectrum).
+    d_FFT_HOLO[:] = fftshift(fft2(d_HOLO, norm = 'ortho'))
     d_calc_kernel_propag_Rayleigh_Sommerfeld[nBlock, nthread](d_KERNEL, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
-    d_FFT_KERNEL = fftshift(fft2(d_KERNEL, norm = 'ortho'))
-    d_FFT_HOLO_PROPAG = d_FFT_HOLO * d_KERNEL
-    d_HOLO_PROPAG = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
+    d_FFT_KERNEL[:] = fftshift(fft2(d_KERNEL, norm = 'ortho'))
+    d_FFT_HOLO_PROPAG[:] = d_FFT_HOLO * d_FFT_KERNEL
+    d_HOLO_PROPAG[:] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
+    return(d_HOLO_PROPAG)
 
 #########################################################################################################################################
 ################################               Calculs volumes               ############################################################
@@ -250,25 +269,32 @@ def volume_propag_angular_spectrum_complex(d_HOLO, d_FFT_HOLO, d_KERNEL, d_FFT_H
 lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distancePropagIni, pasPropag, nbPropag, f_pix_min, f_pix_max):
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
 
     d_FFT_HOLO[:] = fftshift(fft2(d_HOLO, norm = 'ortho'))
 
-    print('somme avant fft:', cp.asnumpy(intensite(d_HOLO)).sum(), 'somme après FFT', cp.asnumpy(intensite(d_FFT_HOLO)).sum())
-
-    if ((f_pix_min != 0) and (f_pix_max != 0)):
+    # 'or' et non 'and': une seule des deux bornes suffit a demander un filtrage, comme
+    # dans spec_filter_FFT. (Un print de debogage figurait aussi ici.)
+    if ((f_pix_min != 0) or (f_pix_max != 0)):
         d_spec_filter_FFT[nBlock, nthread](d_FFT_HOLO, d_FFT_HOLO, nb_pix_X, nb_pix_Y, f_pix_min, f_pix_max)
 
     for i in range(nbPropag):
         distance = distancePropagIni + i * pasPropag
         d_calc_kernel_angular_spectrum_jit[nBlock, nthread](d_KERNEL, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
-        d_FFT_HOLO_PROPAG = d_FFT_HOLO * d_KERNEL
-        d_HOLO_VOLUME_PROPAG[:,:,i] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
+        d_FFT_HOLO_PROPAG[:] = d_FFT_HOLO * d_KERNEL
+        # Volume ordonne (Z, Y, X) comme partout ailleurs: le plan i s'ecrit en [i,:,:].
+        d_HOLO_VOLUME_PROPAG[i,:,:] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
 
 def spec_filter_FFT(d_FFT_HOLO, d_FFT_HOLO_FILTERED, nb_pix_X, nb_pix_Y, f_pix_min, f_pix_max):
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
     
     if f_pix_min != 0 or f_pix_max != 0:
         # Apply filtering: d_FFT_HOLO -> d_FFT_HOLO_FILTERED
@@ -280,9 +306,11 @@ def spec_filter_FFT(d_FFT_HOLO, d_FFT_HOLO_FILTERED, nb_pix_X, nb_pix_Y, f_pix_m
 
 def volume_propag_angular_spectrum_to_module(d_HOLO, d_FFT_HOLO, d_FFT_HOLO_FILTERED, d_KERNEL, d_HOLO_FILTERED, d_FFT_HOLO_PROPAG, d_HOLO_PROPAG, d_HOLO_VOLUME_PROPAG_MODULE,
 lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distancePropagIni, pasPropag, nbPropag, f_pix_min, f_pix_max):
-    from core import stat_plane
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
 
     d_FFT_HOLO[:] = fftshift(fft2(d_HOLO, norm = 'ortho'))
 
@@ -302,27 +330,33 @@ def volume_propag_Rayleigh_Sommerfeld(d_HOLO, d_FFT_HOLO, d_KERNEL, d_FFT_KERNEL
 lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, pasPropag, nbPropag):
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
 
-    d_FFT_HOLO = fftshift(fft2(d_HOLO, norm = 'ortho'))
+    # Affectations en place, et volume ordonne (Z, Y, X): le plan i s'ecrit en [i,:,:].
+    d_FFT_HOLO[:] = fftshift(fft2(d_HOLO, norm = 'ortho'))
     for i in range(nbPropag):
         distance = (i + 1)* pasPropag
         d_calc_kernel_propag_Rayleigh_Sommerfeld[nBlock, nthread](d_KERNEL, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
-        #affichage(phase(d_KERNEL))
-        d_FFT_KERNEL = fftshift(fft2(d_KERNEL, norm = 'ortho'))
-        #affichage(phase(d_FFT_KERNEL))
-        d_FFT_HOLO_PROPAG = d_FFT_HOLO * d_KERNEL
-        d_HOLO_VOLUME_PROPAG[:,:,i] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
+        d_FFT_KERNEL[:] = fftshift(fft2(d_KERNEL, norm = 'ortho'))
+        d_FFT_HOLO_PROPAG[:] = d_FFT_HOLO * d_FFT_KERNEL
+        d_HOLO_VOLUME_PROPAG[i,:,:] = ifft2(ifftshift(d_FFT_HOLO_PROPAG), norm = 'ortho')
 
 def volume_propag_fresnell(d_HOLO, d_Holo_temp, d_FFT, d_HOLO_VOLUME_PROPAG, 
 lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, pasPropag, nbPropag):
 
     nthread = 1024
-    nBlock = math.ceil(nb_pix_X * nb_pix_Y // nthread)
+    # ceil(a // b) est un faux arrondi: la division entiere tronque avant l'appel a ceil,
+    # donc les derniers pixels n'etaient pas couverts quand nb_pix_X*nb_pix_Y n'est pas
+    # multiple de nthread (cas exact en 1024x1024, faux des qu'on change de capteur).
+    nBlock = (nb_pix_X * nb_pix_Y + nthread - 1) // nthread
 
     for i in range(nbPropag):
         distance = (i + 1)* pasPropag
         d_propag_fresnel_phase1_jit[nBlock, nthread](d_HOLO, d_Holo_temp, lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
-        d_FFT = fftshift(fft2(d_Holo_temp, norm = 'ortho'))
-        d_propag_fresnel_phase2_jit[nBlock, nthread](d_FFT, d_HOLO_VOLUME_PROPAG[:,:,i], lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
+        d_FFT[:] = fftshift(fft2(d_Holo_temp, norm = 'ortho'))
+        # Volume ordonne (Z, Y, X): le plan i s'ecrit en [i,:,:].
+        d_propag_fresnel_phase2_jit[nBlock, nthread](d_FFT, d_HOLO_VOLUME_PROPAG[i,:,:], lambda_milieu, magnification, pixSize, nb_pix_X, nb_pix_Y, distance)
 
