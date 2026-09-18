@@ -6,7 +6,8 @@ from scipy import fft
 from traitement_holo import *
 try:
     import cupy as cp
-    from traitement_holo import calc_holo_moyen, lister_images, read_image, projection_bool
+    from traitement_holo import (calc_holo_moyen, lister_images, read_image, projection_bool,
+                                 lire_hologramme, recadrer_au_centre)
     import propagation as propag
     import focus 
     from focus import Focus_type
@@ -201,11 +202,18 @@ class HoloTrackerCore:
                 "ou décocher 'Remove mean Hologram'")
         if self.mean_hologram_image_path.lower().endswith('.npy'):
             # Legacy NPY format
-            self.h_mean_holo = np.load(self.mean_hologram_image_path)
+            moyenne = np.load(self.mean_hologram_image_path).astype(np.float64)
         else:
-            # New TIF format
-            mean_pil = Image.open(self.mean_hologram_image_path)
-            self.h_mean_holo = np.array(mean_pil)
+            # TIF, sans conversion 8 bits
+            moyenne = lire_hologramme(self.mean_hologram_image_path)
+
+        # Recadrer AU CHARGEMENT, exactement comme chaque hologramme brut l'est par
+        # read_image. Le faire ici plutot qu'au calcul de la moyenne permet de garder un
+        # seul fichier de moyenne pour plusieurs tailles d'analyse.
+        moyenne = recadrer_au_centre(
+            moyenne, (int(self.holo_size_x), int(self.holo_size_y)),
+            nom="L'hologramme moyen ({})".format(os.path.basename(self.mean_hologram_image_path)))
+        self.h_mean_holo = moyenne.astype(np.float32)
 
     def print_parameters(self):
         """Print all parameters, one parameter per line"""

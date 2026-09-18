@@ -501,6 +501,8 @@ class CoreCommunicator:
             # Si un hologramme est fourni, le re-traiter avec les nouveaux paramètres
             if directory and filename:
                 results_data = self._process_hologram_pipeline(directory, filename)
+                # Le parametre qui a declenche ce retraitement, pour la barre d'etat
+                results_data['changed_parameter'] = command.data.get('changed_parameter')
                 return self._create_result(CommandType.UPDATE_ALL_PARAMETERS, results_data)
             else:
                 # Pas d'hologramme, juste confirmer la mise à jour

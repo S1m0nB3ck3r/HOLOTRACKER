@@ -260,9 +260,14 @@ class HoloTrackerController:
                     self.update_status(f"Error: {result.data['error']}", is_error=True)
                 else:
                     self.clear_error()  # Clear any previous error
-                    # Suppression du message verbeux "Parameters updated - Hologram reprocessed - Found N objects"
-                    # Le comptage sera visible dans les autres onglets
-                    pass
+                    # Comme a l'entree en mode test, suivi du parametre qui a provoque ce
+                    # retraitement. Sans ce message, la barre d'etat restait figee sur le
+                    # premier comptage et chaque relance paraissait sans effet.
+                    message = f"Hologram processed - Found {num_objects} objects"
+                    parametre = result.data.get('changed_parameter')
+                    if parametre:
+                        message += f" ({parametre[0]} = {parametre[1]})"
+                    self.update_status(message)
             else:
                 # Just parameter update without reprocessing - no status message needed
                 pass
@@ -472,7 +477,11 @@ class HoloTrackerController:
                     command_data = {
                         'parameters': self.ui.parameters,
                         'directory': self.current_display_info['directory'],
-                        'filename': self.current_display_info['filename']
+                        'filename': self.current_display_info['filename'],
+                        # Renvoye avec le resultat pour l'afficher dans la barre d'etat.
+                        # Voyage avec la commande plutot que d'etre memorise ici: si deux
+                        # parametres changent coup sur coup, chaque resultat garde le sien.
+                        'changed_parameter': (name, value)
                     }
                     # Clear previous error before restarting pipeline
                     self.clear_error()

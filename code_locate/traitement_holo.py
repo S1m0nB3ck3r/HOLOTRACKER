@@ -266,12 +266,32 @@ def lire_hologramme(chemin, taille=None):
         image = image.mean(axis=2)          # couleur -> niveaux de gris
 
     if taille is not None:
-        sizeX, sizeY = int(taille[0]), int(taille[1])
-        sy, sx = image.shape
-        offsetX = (sx - sizeX) // 2
-        offsetY = (sy - sizeY) // 2
-        image = image[offsetY:offsetY + sizeY, offsetX:offsetX + sizeX]
+        image = recadrer_au_centre(image, taille, nom=os.path.basename(chemin))
     return image
+
+
+def recadrer_au_centre(image, taille, nom="l'image"):
+    """Extrait la zone centrale (sizeX, sizeY) d'une image 2D.
+
+    C'est le meme recadrage que celui applique a chaque hologramme brut: l'hologramme
+    moyen doit etre recadre de la meme facon, sinon la division ou la soustraction echoue
+    sur une difference de dimensions (camera 1280 x 1024 analysee en 1024 x 1024, par
+    exemple).
+
+    Leve une erreur explicite si l'image est plus petite que la zone demandee: sans ce
+    controle, les decalages deviennent negatifs et le decoupage renvoie silencieusement
+    une zone fausse.
+    """
+    sizeX, sizeY = int(taille[0]), int(taille[1])
+    sy, sx = image.shape
+    if sx < sizeX or sy < sizeY:
+        raise ValueError(
+            "{} fait {} x {} pixels, plus petit que la zone analysee ({} x {}). "
+            "Reduire 'Holo size X/Y' ou recalculer l'hologramme moyen.".format(
+                nom, sx, sy, sizeX, sizeY))
+    offsetX = (sx - sizeX) // 2
+    offsetY = (sy - sizeY) // 2
+    return image[offsetY:offsetY + sizeY, offsetX:offsetX + sizeX]
 
 def sum_plans(d_volum_focus):
     return(d_volum_focus.sum(axis = 0), d_volum_focus.sum(axis = 1), d_volum_focus.sum(axis = 2))

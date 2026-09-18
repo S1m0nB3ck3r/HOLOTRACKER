@@ -258,6 +258,53 @@ def check_erreurs_explicites(log):
         shutil.rmtree(rep, ignore_errors=True)
 
 
+def check_chargement_recadre(log):
+    """L'hologramme moyen est recadre au chargement, comme chaque hologramme brut.
+
+    Defaut corrige le 2026-09-18: la moyenne etait calculee et relue sur l'image ENTIERE
+    alors que l'hologramme brut est recadre au centre sur holo_size. Des que les images
+    depassent la zone analysee (camera 1280 x 1024 analysee en 1024 x 1024), la division
+    ou la soustraction echouait sur une difference de dimensions.
+    """
+    grande = np.arange(20 * 30, dtype=np.float64).reshape(20, 30) / 600.0   # flottant < 1
+    rep = tempfile.mkdtemp(prefix="mean_load_")
+    try:
+        chemin = os.path.join(rep, "moyenne.tif")
+        Image.fromarray(grande.astype(np.float32), mode="F").save(chemin)
+
+        core = HoloTrackerCore()
+        core.set_parameters(mean_hologram_image_path=chemin, holo_size_x=10, holo_size_y=8)
+        core.load_mean_hologram()
+        attendu = grande[(20 - 8) // 2:(20 - 8) // 2 + 8, (30 - 10) // 2:(30 - 10) // 2 + 10]
+        assert core.h_mean_holo.shape == (8, 10), (
+            "moyenne non recadree au chargement: forme {} au lieu de (8, 10)".format(
+                core.h_mean_holo.shape))
+        assert np.allclose(core.h_mean_holo, attendu, atol=1e-6), (
+            "la moyenne n'est pas recadree au centre")
+        assert core.h_mean_holo.dtype == np.float32, (
+            "type {} au lieu de float32".format(core.h_mean_holo.dtype))
+
+        # Meme chose pour l'ancien format .npy
+        chemin_npy = os.path.join(rep, "moyenne.npy")
+        np.save(chemin_npy, grande)
+        core.set_parameters(mean_hologram_image_path=chemin_npy)
+        core.load_mean_hologram()
+        assert core.h_mean_holo.shape == (8, 10), "fichier .npy non recadre"
+
+        # Une moyenne plus petite que la zone analysee doit produire un message clair
+        core.set_parameters(mean_hologram_image_path=chemin, holo_size_x=40, holo_size_y=8)
+        try:
+            core.load_mean_hologram()
+            raise AssertionError("une moyenne trop petite aurait du etre refusee")
+        except ValueError as err:
+            assert "plus petit" in str(err), "message peu clair: {}".format(err)
+
+        log("chargement recadre  : moyenne 20 x 30 -> 8 x 10 au centre, .tif et .npy, "
+            "refus explicite si trop petite")
+    finally:
+        shutil.rmtree(rep, ignore_errors=True)
+
+
 def check_rappel_progression(log):
     """Le rappel de progression doit être appelé une fois par image, dans l'ordre."""
     rng = np.random.default_rng(5)
@@ -314,6 +361,10 @@ def test_erreurs_explicites():
     check_erreurs_explicites(_muet)
 
 
+def test_chargement_recadre():
+    check_chargement_recadre(_muet)
+
+
 def test_rappel_progression():
     check_rappel_progression(_muet)
 
@@ -331,6 +382,7 @@ def main():
         ("recadrage centré", check_recadrage),
         ("formats de sortie", check_formats_sortie),
         ("messages d'erreur", check_erreurs_explicites),
+        ("chargement recadré", check_chargement_recadre),
         ("rappel de progression", check_rappel_progression),
     ]
     lignes = []

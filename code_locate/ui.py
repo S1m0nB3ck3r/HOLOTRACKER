@@ -10,6 +10,34 @@ import json
 import os
 from ui_styles import ICONS, format_button_text, create_icon_button
 
+
+def describe_filter_radius(radius, n_pix, pixel_size, magnification, kind):
+    """Traduit un rayon du filtre spectral (en pixels de frequence) en grandeurs physiques.
+
+    Le filtre coupe un disque de rayon `radius` pixels dans la FFT de l'hologramme. La
+    coupure physique correspondante depend de la taille de l'image et du pixel cote objet:
+    le meme reglage ne filtre pas les memes structures a 512 et a 1024 pixels, ni avec un
+    pixel camera de 5,5 ou de 7 um.
+
+        pixel cote objet     dx = pixel_size / magnification
+        frequence            f  = radius / (n_pix * dx)          cycles par metre
+        periode coupee          = n_pix * dx / radius            metres
+        periode en pixels       = n_pix / radius                 pixels de l'hologramme
+
+    kind : "high" (le rayon min: supprime les structures plus GRANDES que la periode, soit
+           le fond et l'enveloppe) ou "low" (le rayon max: supprime les details plus FINS).
+    """
+    if radius <= 0:
+        return "no filtering" if kind == "high" else "no upper cut-off"
+    dx = pixel_size / magnification
+    periode_um = n_pix * dx / radius * 1e6
+    periode_px = n_pix / radius
+    if kind == "high":
+        texte = "removes structures > {:.2f} µm ({:.1f} px)".format(periode_um, periode_px)
+    else:
+        texte = "removes details < {:.2f} µm ({:.1f} px)".format(periode_um, periode_px)
+    return texte
+
 # Journal: voir holo_log.py. Les exceptions ignorées y laissent une trace,
 # avec fichier, fonction et ligne, sans interrompre l'application.
 import logging
@@ -384,6 +412,11 @@ class HoloTrackerApp:
         fourier_frame.pack(fill="x", padx=10, pady=2)
         self.high_pass_entry = self._add_label_entry(fourier_frame, "High pass (0=none) (pix):", 0, IntegerEntry)
         self.low_pass_entry = self._add_label_entry(fourier_frame, "Low Pass (0=none) (pix):", 1, IntegerEntry)
+        # Traduction physique des deux rayons, mise a jour a chaque changement de parametre
+        self.filter_info_var = tk.StringVar(value="")
+        ttk.Label(fourier_frame, textvariable=self.filter_info_var, justify="left",
+                  font=("TkDefaultFont", 8), wraplength=320).grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(2, 0))
         
         # Focus frame
         focus_frame = ttk.LabelFrame(scrollable_frame, text="Focus", padding=(5, 2))
@@ -517,6 +550,32 @@ class HoloTrackerApp:
         # Update plane number spinbox range when number_of_planes changes
         if name == "number_of_planes":
             self.update_plane_number_range()
+
+        self.update_filter_info()
+
+    def update_filter_info(self):
+        """Affiche sous le filtre spectral ce que chaque rayon coupe physiquement."""
+        if not hasattr(self, "filter_info_var"):
+            return
+        try:
+            n_x = int(self.holo_size_x_entry.get())
+            n_y = int(self.holo_size_y_entry.get())
+            args = dict(pixel_size=float(self.pixel_size_entry.get()),
+                        magnification=float(self.objective_magnification_entry.get()))
+            lignes = []
+            for nom, champ, kind in (("High pass", self.high_pass_entry, "high"),
+                                     ("Low pass", self.low_pass_entry, "low")):
+                rayon = int(champ.get())
+                texte = describe_filter_radius(rayon, n_x, kind=kind, **args)
+                if n_y != n_x and rayon > 0:
+                    # Le filtre est un disque en pixels: sur une image non carree, la
+                    # coupure physique differe selon l'axe.
+                    texte += "  [Y: " + describe_filter_radius(rayon, n_y, kind=kind, **args) + "]"
+                lignes.append("{} {}: {}".format(nom, rayon, texte))
+            self.filter_info_var.set("\n".join(lignes))
+        except (ValueError, ZeroDivisionError):
+            # Un champ vide ou en cours de saisie: on n'affiche rien plutot qu'un faux calcul
+            self.filter_info_var.set("")
 
     def on_remove_mean_changed(self):
         if self.controller:
@@ -1542,6 +1601,8 @@ class HoloTrackerApp:
         # Update plane number range based on loaded parameters
         if hasattr(self, 'plane_number_spinbox'):
             self.update_plane_number_range()
+
+        self.update_filter_info()
 
     def show_help(self):
         """Display comprehensive help dialog with step-by-step procedure"""
