@@ -1,0 +1,10 @@
+etape,ms,n
+propagation,148.7287849999575,40
+focus,474.8444925000513,40
+mailles mediane + MAD,27.928514999803156,40
+mailles fond ecrete + sigma,245.39347000004454,40
+seuil global,147.9082812501474,80
+interpolation du seuil,138.39231749998362,160
+binarisation + etiquetage,59.620051874969704,160
+barycentres,28.169298750049165,160
+sommets + centroides,82.03036374995918,160

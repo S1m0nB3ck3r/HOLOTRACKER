@@ -11,7 +11,8 @@ try:
     import propagation as propag
     import focus 
     from focus import Focus_type
-    from CCL3D import CCL3D, calc_threshold, CCA_CUDA_float, CCL_filter, type_threshold, dobjet
+    from CCL3D import (CCL3D, calc_threshold, calc_threshold_local, mailles_fond_mad,
+                       CCA_CUDA_float, CCL_filter, type_threshold, dobjet)
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     import pandas as pd
@@ -28,6 +29,14 @@ log = logging.getLogger(__name__)
 
 # Maximum number of objects that can be detected and displayed
 MAX_OBJECT_DETECTION = 500
+
+# Mailles du seuil local: 25 plans sur 64 x 64 pixels, soit environ 12,5 x 11,2 x 11,2 um
+# avec la geometrie de reference. Ce ne sont pas des reglages: mesure sur hologrammes
+# simules, la taille n'a pas d'influence entre 32 et 128 pixels (F1 de 0,935 a 0,914), et
+# le seuil se situe de toute facon a sept fois le fond local. Elles sont donc fixees ici
+# plutot qu'exposees dans l'interface.
+MAILLE_XY = 64
+MAILLE_Z = 25
 
 
 class HoloTrackerCore:
@@ -69,7 +78,7 @@ class HoloTrackerCore:
         self.wavelength = 660e-9
         self.medium_optical_index = 1.33
         self.objective_magnification = 40.0
-        self.pixel_size = 5.5e-6
+        self.pixel_size = 7e-6
         self.holo_size_x = 1024
         self.holo_size_y = 1024
         self.distance_ini = 20e-6
@@ -85,15 +94,33 @@ class HoloTrackerCore:
         self.low_pass = 125
         
         # Focus parameters
-        self.focus_type = "TENEGRAD"
+        # SUM_OF_VARIANCE plutot que TENEGRAD: sur bacteries en batonnet, le simulateur
+        # du projet frere mesure 62 sigma de contraste contre 19, une dispersion en Z de
+        # +/-0.13 um contre +/-0.36, et 85% des bacteries couchees retrouvees contre 70%.
+        # Il n'est pas plus couteux (253 a 371 ms contre 383 ms pour 1024x1024x200 plans).
+        self.focus_type = "SUM_OF_VARIANCE"
         self.sum_size = 15
         
         # Thresholding and detection parameters
-        self.nb_StdVar_threshold = 14.0
+        # K du seuil LOCAL (mode "local MAD"), mesure comme optimal entre 20 et 25 sur
+        # hologrammes simules, de 5 a 200 bacteries. Le facteur 1,4826 du MAD le ramene a
+        # l'echelle d'un ecart-type, donc ce K garde l'ordre de grandeur de l'ancien.
+        # En mode "global", le meilleur K mesure est 15, et il depend de la densite: 20 a
+        # 5 bacteries, 10 a 200. C'est precisement ce defaut que le seuil local corrige.
+        # A recaler sur chaque film: les K simules le sont avec un filtre 15-250, le defaut
+        # ici est 15-125.
+        self.nb_StdVar_threshold = 20.0
         self.connectivity = 26
         self.min_voxel = 0
         self.max_voxel = 0
         self.batch_threshold = "compute on 1st hologram"
+        # "local MAD": seuil mediane + K x 1,4826 x MAD par maille, mesure comme meilleur
+        # que le seuil global (F1 moyen 0,939 contre 0,882 sur hologrammes simules, et 30 a
+        # 50 % de detections de plus sur le film reel a persistance egale). "global" reste
+        # disponible: c'est l'ancien defaut, et l'etalon de test_pipeline.py le mesure.
+        self.threshold_mode = "local MAD"
+        # Grilles de fond et de dispersion du seuil local, ou None en mode global.
+        self.infos_seuil = None
         
         # Display parameters
         self.additional_display = "Centroid positions"
@@ -131,6 +158,7 @@ class HoloTrackerCore:
         "focus_type": str,
         "cleaning_type": str,
         "batch_threshold": str,
+        "threshold_mode": str,
         "additional_display": str,
     }
 
@@ -227,7 +255,7 @@ class HoloTrackerCore:
                                   'h_filtered_holo', 'd_filtered_holo', 'd_fft_holo', 
                                   'd_fft_holo_filtered', 'd_fft_holo_propag', 'd_holo_propag',
                                   'd_KERNEL', 'd_FFT_KERNEL', 'd_volume_module', 'd_bin_volume_focus',
-                                  'd_mean_holo', 'current_features', 'threshold']]
+                                  'd_mean_holo', 'current_features', 'threshold', 'infos_seuil']]
         
         for attr in sorted(param_attrs):
             value = getattr(self, attr)
@@ -524,16 +552,47 @@ class HoloTrackerCore:
                 need_recalc = False
             
             if need_recalc:
-                self.threshold = calc_threshold(self.d_volume_module, nb_StdVar_threshold)
+                if str(self.threshold_mode).strip().lower() == "global":
+                    # Un seul seuil pour tout le volume: moyenne + K x ecart-type, objets
+                    # compris. C'est l'ancien defaut, conserve pour comparaison et parce que
+                    # l'etalon de tests/test_pipeline.py le mesure.
+                    self.threshold = calc_threshold(self.d_volume_module,
+                                                    nb_StdVar_threshold)
+                    self.infos_seuil = None
+                else:
+                    # Seuil local: mediane + K x 1,4826 x MAD dans chaque maille de
+                    # MAILLE_Z plans sur MAILLE_XY x MAILLE_XY pixels, interpole ensuite.
+                    # En mode lot, ce sont ces grilles (quelques milliers de valeurs) qui
+                    # sont mises en cache, et non un scalaire.
+                    self.infos_seuil = mailles_fond_mad(
+                        self.d_volume_module, nb_StdVar_threshold,
+                        MAILLE_XY, MAILLE_Z)
+                    self.threshold = float(cp.asnumpy(
+                        self.infos_seuil['seuil_mailles']).mean())
                 # Mark first hologram as done in batch mode
                 if self.mode == 'BATCH':
                     self.batch_first_hologram_done = True
 
+            # Le seuil passe a CCL3D est soit un flottant (mode global), soit un volume
+            # interpole depuis les grilles de mailles (mode local).
+            if self.infos_seuil is None:
+                seuil_pour_ccl = self.threshold
+            else:
+                seuil_pour_ccl, _ = calc_threshold_local(
+                    self.d_volume_module, nb_StdVar_threshold, MAILLE_XY, MAILLE_Z,
+                    infos=self.infos_seuil)
+
             # CCL3D
             d_labels, number_of_labels = CCL3D(
                 self.d_bin_volume_focus, self.d_volume_module, 
-                type_threshold.THRESHOLD, self.threshold, n_connectivity
+                type_threshold.THRESHOLD, seuil_pour_ccl, n_connectivity
             )
+            if self.infos_seuil is not None:
+                # Le volume de seuil pese autant que le volume de focus (800 Mo en
+                # 1024x1024x240): le liberer des qu'il a servi, avant que l'analyse des
+                # etiquettes n'alloue a son tour.
+                del seuil_pour_ccl
+                cp.get_default_memory_pool().free_all_blocks()
 
             t4 = time.perf_counter()
             t_ccl = t4 - ccl_start

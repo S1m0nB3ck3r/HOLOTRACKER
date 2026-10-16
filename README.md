@@ -244,8 +244,12 @@ python code_link/main_holotracker_link.py
 - Higher values = stricter, may miss particles
 
 **Focus Metric:** Recommended options:
-- **TENEGRAD:** Best general-purpose (gradient-based)
+- **SUM_OF_VARIANCE:** default, and the best measured criterion on rod-shaped bacteria
+- **TENEGRAD:** general-purpose (gradient-based)
 - **MEAN_GEO_ALL:** Robust combination of multiple metrics (geometric mean of the 5 criteria)
+
+The threshold K depends on the criterion: at equal K, SUM_OF_VARIANCE detects about twice
+as many objects as TENEGRAD, so K must be re-tuned when the metric changes.
 
 ### HoloTracker Link
 

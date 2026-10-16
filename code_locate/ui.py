@@ -467,12 +467,30 @@ class HoloTrackerApp:
         # CCL parameters frame
         ccl_frame = ttk.LabelFrame(scrollable_frame, text="CCL parameters", padding=(5, 2))
         ccl_frame.pack(fill="x", padx=10, pady=(2, 5))
-        self.threshold_entry = self._add_label_entry(ccl_frame, "Threshold (N x Standard deviation):", 0, ScientificFloatEntry)
-        
+        self.threshold_entry = self._add_label_entry(ccl_frame, "Threshold (N x MAD or Std deviation):", 0, ScientificFloatEntry)
+
+        # Threshold mode: the local threshold follows the background, so the same K works
+        # whatever the object density; the global one does not (measured: its best K goes
+        # from 20 at 5 objects to 10 at 200). Default: local MAD.
+        ttk.Label(ccl_frame, text="Threshold mode:").grid(row=1, column=0, sticky="w", pady=1)
+        self.threshold_mode_combobox = ttk.Combobox(ccl_frame, values=["local MAD", "global"], width=25)
+        self.threshold_mode_combobox.grid(row=1, column=1, sticky="w", pady=1)
+        self.threshold_mode_combobox.set("local MAD")
+        self.threshold_mode_combobox.last_value = None
+
+        def on_threshold_mode_change(event):
+            current_value = self.threshold_mode_combobox.get()
+            if current_value != self.threshold_mode_combobox.last_value:
+                self.threshold_mode_combobox.last_value = current_value
+                self._maj_batch_threshold_selon_mode()
+                self.on_parameter_changed("threshold_mode", current_value)
+
+        self.threshold_mode_combobox.bind("<<ComboboxSelected>>", on_threshold_mode_change)
+
         # Move batch threshold combobox under Threshold in CCL parameters
-        ttk.Label(ccl_frame, text="Batch threshold:").grid(row=1, column=0, sticky="w", pady=1)
+        ttk.Label(ccl_frame, text="Batch threshold:").grid(row=2, column=0, sticky="w", pady=1)
         self.batch_threshold_combobox = ttk.Combobox(ccl_frame, values=["compute on 1st hologram", "compute on each hologram"], width=25)
-        self.batch_threshold_combobox.grid(row=1, column=1, sticky="w", pady=1)
+        self.batch_threshold_combobox.grid(row=2, column=1, sticky="w", pady=1)
         self.batch_threshold_combobox.set("compute on 1st hologram")  # Default value
         self.batch_threshold_combobox.last_value = None
         
@@ -483,10 +501,11 @@ class HoloTrackerApp:
                 self.on_parameter_changed("recalc_threshold", current_value == "compute on each hologram")
         
         self.batch_threshold_combobox.bind("<<ComboboxSelected>>", on_batch_threshold_change)
+        self._maj_batch_threshold_selon_mode()
         
-        ttk.Label(ccl_frame, text="Connectivity:").grid(row=2, column=0, sticky="w", pady=1)
+        ttk.Label(ccl_frame, text="Connectivity:").grid(row=3, column=0, sticky="w", pady=1)
         self.connectivity_combobox = ttk.Combobox(ccl_frame, values=["6", "18", "26"], width=10)
-        self.connectivity_combobox.grid(row=2, column=1, sticky="w", pady=1)
+        self.connectivity_combobox.grid(row=3, column=1, sticky="w", pady=1)
         self.connectivity_combobox.last_value = None
         
         def on_connectivity_change(event):
@@ -496,8 +515,8 @@ class HoloTrackerApp:
                 self.on_parameter_changed("n_connectivity", current_value)
         
         self.connectivity_combobox.bind("<<ComboboxSelected>>", on_connectivity_change)
-        self.min_voxel_entry = self._add_label_entry(ccl_frame, "min voxel:", 3, IntegerEntry)
-        self.max_voxel_entry = self._add_label_entry(ccl_frame, "max voxel:", 4, IntegerEntry)
+        self.min_voxel_entry = self._add_label_entry(ccl_frame, "min voxel:", 4, IntegerEntry)
+        self.max_voxel_entry = self._add_label_entry(ccl_frame, "max voxel:", 5, IntegerEntry)
 
     def _add_label_entry(self, parent, text, row, entry_class=ScientificFloatEntry):
         ttk.Label(parent, text=text).grid(row=row, column=0, sticky="w", pady=1)
@@ -717,10 +736,51 @@ class HoloTrackerApp:
         self.exit_button = ttk.Button(bottom_buttons_frame, text=format_button_text("EXIT", "exit"), bootstyle="danger", command=self.on_closing)
         self.exit_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
 
+    def _maj_batch_threshold_selon_mode(self):
+        """Le seuil local se recalcule a chaque hologramme, et ce choix est impose.
+
+        Un seuil local suit le fond de l'hologramme qu'il mesure. Le reutiliser pour tout
+        un film - ce que fait "compute on 1st hologram" - reviendrait a appliquer aux
+        images suivantes le fond de la premiere, c'est-a-dire a perdre ce qui fait
+        l'interet du mode local. Et le recalcul ne coute que 28 ms par hologramme, contre
+        148 ms pour le seuil global qu'il remplace. En mode "global", le choix garde son
+        sens et reste ouvert.
+        """
+        if not hasattr(self, "batch_threshold_combobox"):
+            return
+        mode = self.threshold_mode_combobox.get() if hasattr(self, "threshold_mode_combobox") else "global"
+        if str(mode).strip().lower() != "global":
+            self.batch_threshold_combobox.set("compute on each hologram")
+            self.batch_threshold_combobox.last_value = "compute on each hologram"
+            self.batch_threshold_combobox.config(state="disabled")
+        else:
+            # readonly, comme les autres listes de l'interface: on choisit dans la liste
+            # sans pouvoir taper une valeur qui n'existe pas.
+            self.batch_threshold_combobox.config(state="readonly")
+
     def update_buttons_state(self, state):
         # WAIT: only allow ENTER TEST MODE and START BATCH
         # TEST_MODE: only allow EXIT TEST MODE
         # BATCH_MODE: only allow STOP BATCH
+        #
+        # Deux reglages sont geles pendant un lot: le type de nettoyage et le mode de
+        # seuil. Les changer en cours de route rendrait le lot incoherent - les premiers
+        # hologrammes auraient ete traites autrement que les suivants - et, en mode
+        # "compute on 1st hologram", le seuil (ou les grilles de mailles du seuil local)
+        # vient du premier hologramme: en changer le mode ensuite n'aurait aucun effet
+        # visible, ce qui est pire qu'un champ grise.
+        pendant_le_lot = "disabled" if state == "BATCH_MODE" else "normal"
+        for liste in (getattr(self, "type_cleaning_combobox", None),
+                      getattr(self, "threshold_mode_combobox", None)):
+            if liste is not None:
+                liste.config(state=pendant_le_lot)
+        if state == "BATCH_MODE":
+            if hasattr(self, "batch_threshold_combobox"):
+                self.batch_threshold_combobox.config(state="disabled")
+        else:
+            # hors lot, c'est le mode de seuil qui decide si ce champ est ouvert
+            self._maj_batch_threshold_selon_mode()
+
         if state == "WAIT":
             self.enter_test_button.config(state="normal")
             self.exit_test_button.config(state="disabled")
@@ -896,7 +956,14 @@ class HoloTrackerApp:
         
         # Analysis parameters
         self.remove_mean_check.config(state=state)
-        self.batch_threshold_combobox.config(state=combobox_state)
+        # "Batch threshold" ne se reactive pas d'office a la fin d'un lot: en mode local
+        # le recalcul a chaque hologramme est impose, c'est donc au mode de seuil de
+        # decider. Cette fonction est appelee APRES update_buttons_state a la sortie du
+        # lot, sans ce test elle aurait le dernier mot et rouvrirait le champ.
+        if enabled:
+            self._maj_batch_threshold_selon_mode()
+        else:
+            self.batch_threshold_combobox.config(state="disabled")
         
         # CCL parameters
         self.threshold_entry.config(state=state)
@@ -1521,6 +1588,7 @@ class HoloTrackerApp:
             "remove_mean": self.remove_mean_check.instate(['selected']),
             "cleaning_type": self.type_cleaning_combobox.get(),
             "batch_threshold": self.batch_threshold_combobox.get(),
+            "threshold_mode": self.threshold_mode_combobox.get(),
             "nb_StdVar_threshold": self.threshold_entry.get(),
             "connectivity": self.connectivity_combobox.get(),
             "min_voxel": self.min_voxel_entry.get(),
@@ -1569,6 +1637,10 @@ class HoloTrackerApp:
             self.type_cleaning_combobox.set("division")  # Default value
         if hasattr(self.type_cleaning_combobox, 'last_value'):
             self.type_cleaning_combobox.last_value = self.type_cleaning_combobox.get()
+
+        # Le mode de seuil vient d'etre restaure: reappliquer la contrainte sur le
+        # recalcul du seuil en mode lot.
+        self._maj_batch_threshold_selon_mode()
             
         if "holograms_directory" in self.parameters:
             self.dir_text.delete(1.0, tk.END)
@@ -1678,8 +1750,9 @@ STEP-BY-STEP PROCEDURE:
    • Choose focus metric from 7 available methods:
      - SUM_OF_INTENSITY: Simple sum of pixel intensities (basic, fast)
      - SUM_OF_LAPLACIAN: Edge detection using Laplacian operator (good for sharp edges)
-     - SUM_OF_VARIANCE: Statistical variance-based metric (robust to noise)
-     - TENEGRAD: Gradient-based focus (recommended for most applications)
+     - SUM_OF_VARIANCE: Statistical variance-based metric (robust to noise).
+       Default: measured as the best criterion on rod-shaped bacteria
+     - TENEGRAD: Gradient-based focus (good general-purpose gradient metric)
      - SUM_OF_GRADIENT: Sum of Sobel gradient magnitudes (edge-sensitive)
      - MEAN_ARITH_ALL: Arithmetic mean of the 5 methods above.
        Careful: the 5 criteria have very different magnitudes, so the result
@@ -1687,7 +1760,18 @@ STEP-BY-STEP PROCEDURE:
      - MEAN_GEO_ALL: Geometric mean of the same 5 methods, computed through
        logarithms for numerical stability. Gives every criterion the same
        relative weight: this is the balanced combination.
-   • TENEGRAD and MEAN_GEO_ALL are recommended for most applications
+   • Threshold mode:
+     - local MAD (default): median + K x 1.4826 x MAD inside each 25 x 64 x 64 voxel
+       mesh, interpolated. The threshold follows the background, so the same K works
+       at any object density
+     - global: mean + K x standard deviation of the whole volume. Simpler, but its
+       best K depends on the density (measured: 20 at 5 objects, 10 at 200)
+   • In local mode the threshold is recomputed for every hologram, and 'Batch threshold'
+     is greyed out: a local threshold follows the background of the hologram it measures,
+     so reusing the first one would defeat its purpose (and costs only 28 ms)
+   • SUM_OF_VARIANCE is the default; TENEGRAD and MEAN_GEO_ALL are good alternatives
+   • The threshold K goes with the criterion: at equal K, SUM_OF_VARIANCE detects
+     about twice as many objects as TENEGRAD. Re-tune K after changing the metric
    • Higher threshold values = stricter particle detection
    • Lower threshold values = more sensitive detection
 
@@ -1759,10 +1843,10 @@ PARAMETER GUIDELINES:
 • Z range should cover your experimental volume
 • Higher Z number improves accuracy but increases computation time
 • Focus metric choice depends on particle characteristics:
-  - TENEGRAD: Best general-purpose gradient-based metric (recommended)
+  - SUM_OF_VARIANCE: default; best measured on rod-shaped bacteria, and robust to noise
+  - TENEGRAD: general-purpose gradient-based metric
   - SUM_OF_GRADIENT: Alternative gradient method using Sobel filters
   - SUM_OF_LAPLACIAN: Good for detecting sharp edges and boundaries
-  - SUM_OF_VARIANCE: Robust to noise, good for uniform particles
   - SUM_OF_INTENSITY: Simple and fast, suitable for high-contrast particles
   - MEAN_ARITH_ALL: Arithmetic mean of 5 methods; dominated by the criterion
     with the largest magnitude, so MEAN_GEO_ALL is usually preferable

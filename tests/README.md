@@ -4,11 +4,23 @@
 
 ```bash
 python tests/test_mean_hologram.py   # l'hologramme moyen (justesse, sans GPU)
+python tests/test_local_maxima.py    # seuil local et maxima locaux (justesse)
 python tests/test_pipeline.py        # la detection: pipeline Locate
 python tests/test_link.py            # la couture: chaine Locate -> Link
 ```
 
-Les deux derniers demandent un GPU CUDA; le premier non.
+Seul le premier se passe de GPU CUDA.
+
+Les deux premiers vérifient une **justesse** sur des données de synthèse dont on connaît la
+réponse exacte ; les deux suivants comparent à un étalon enregistré.
+
+`test_local_maxima.py` pose trois bosses gaussiennes à des positions connues dans un volume
+de focus synthétique et exige que `calc_threshold_local` et `maxima_centroides` les
+retrouvent : trois objets, à moins d'un dixième de voxel. Il mesure aussi la limite de
+séparation de la méthode (deux bosses plus proches qu'une demi-boîte n'en donnent qu'une),
+vérifie que l'écrêtage empêche un objet de relever le seuil de sa propre maille, et inscrit
+la limite de cet écrêtage : un objet 5 000 fois plus fort que le bruit garde un seuil local
+gonflé de 355 % après trois passes.
 
 Aucune dépendance en plus de celles du projet. `pytest tests/test_pipeline.py` fonctionne
 aussi si pytest est installé (il ne l'est pas actuellement sur cette machine).

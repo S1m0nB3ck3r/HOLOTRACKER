@@ -22,5 +22,6 @@
     "max_voxel": "0",
     "holograms_directory": "Film REF/cleaned",
     "image_type": "TIF",
-    "additional_display": "Segmentation + Centroid"
+    "additional_display": "Segmentation + Centroid",
+    "threshold_mode": "global"
 }

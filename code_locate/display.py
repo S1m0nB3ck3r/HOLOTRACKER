@@ -506,8 +506,14 @@ def _add_centroid_markers_for_plane(core, image, plane_number):
                 cam_magnification = float(core.objective_magnification)  # Use same parameter name
                 dz = float(core.step)  # Step size in meters
 
-                # Calculate the plane number for this feature
-                feature_plane = int(z_um / (dz * 1e6))  # Convert to plane index
+                # Calculate the plane number for this feature.
+                # Z est absolu: il est compte depuis le plan de l'hologramme, donc il
+                # inclut distance_ini (voir CCA_CUDA_float, z_offset). Il faut retirer cet
+                # offset pour retrouver l'indice du plan reconstruit, sinon les marqueurs
+                # sont decales de distance_ini / step plans - vingt plans pour
+                # distance_ini = 10 um et un pas de 0,5 um, et les points rouges tombent
+                # sur les objets d'un autre plan que celui affiche.
+                feature_plane = int((z_m - float(core.distance_ini)) / dz)
 
                 # Only show markers for features in the current plane (with some tolerance)
                 if abs(feature_plane - plane_number) <= 1:  # Allow ±1 plane tolerance
@@ -675,8 +681,10 @@ def add_detection_markers_to_image_2d_projection(core, image, results, projectio
                 x_pix = int(x_m / dx)
                 y_pix = int(y_m / dy)
 
-                # Z coordinate in pixels (depth dimension) - convert from meters to plane index
-                z_pix = int(z_m / dz)  # Direct conversion from meters to plane index
+                # Z coordinate in pixels (depth dimension) - convert from meters to plane
+                # index. Meme correction que ci-dessus: Z inclut distance_ini, les
+                # projections XZ et YZ sont indexees a partir du premier plan reconstruit.
+                z_pix = int((z_m - float(core.distance_ini)) / dz)
 
                 # Choose coordinates based on projection type
                 if projection_type == 'XY':

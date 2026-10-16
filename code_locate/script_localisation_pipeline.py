@@ -55,7 +55,7 @@ display_images = False
 script_dir = os.path.dirname(os.path.abspath(__file__))  # /path/to/code
 project_root = os.path.dirname(script_dir)  # /path/to/project
 path = os.path.join(project_root, 'Film REF')
-result_filename = os.path.join(path, 'result_sum15_TENEGRAD_STD15_each.csv')
+result_filename = os.path.join(path, 'result_sum15_VARIANCE_STD15.csv')
 type_image = 'bmp'
 
 #hologram parameters
@@ -63,7 +63,10 @@ medium_wavelenght = 660e-9 / 1.33
 cam_magnification = 40.0
 cam_nb_pix_X = 1024
 cam_nb_pix_Y = 1024
-nb_plane = 200
+# 240 plans de 0,5 um: le volume va de 0 a 119,5 um, comme dans
+# script_localisation_pipeline_local_maxima.py. Les deux scripts analysent ainsi le meme
+# volume, et leurs resultats sont comparables.
+nb_plane = 240
 cam_pix_size = 7e-6
 # Toutes les distances sont en METRES, comme dans l'application graphique.
 # Ce script exprimait auparavant dx, dy et dz en micrometres tout en produisant un CSV
@@ -71,13 +74,16 @@ cam_pix_size = 7e-6
 # memes unites.
 dx = cam_pix_size / cam_magnification   # en metres
 dy = cam_pix_size / cam_magnification   # en metres
-dz = 0.2e-6                             # en metres
+dz = 0.5e-6                             # en metres
 distance_ini = 0.0                      # distance de propagation du premier plan, en metres
 
 
 # threshold, focus and CCL parameters
+# Memes defauts que le GUI (core.__init__): SUM_OF_VARIANCE et K = 15. A K egal, ce
+# critere detecte environ deux fois plus d'objets que TENEGRAD, les deux vont ensemble.
+type_focus = Focus_type.SUM_OF_VARIANCE
 sum_size = 15
-nb_StdVar_threshold = 10
+nb_StdVar_threshold = 11
 type_Threshold = type_threshold.THRESHOLD
 n_connectivity = 26
 particle_filter_size = 0
@@ -157,7 +163,7 @@ for image in os.listdir(path):
 
 
         # focus on the volume (INPLACE)
-        focus.focus(d_volume_module, d_volume_module, sum_size, Focus_type.TENEGRAD)
+        focus.focus(d_volume_module, d_volume_module, sum_size, type_focus)
         t3 = time.perf_counter()
 
         if display_images:

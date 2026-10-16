@@ -1,0 +1,49 @@
+{
+    "mode": "bacteria_random",
+    "nb_holo": 3,
+    "output_dir": "C:\\TRAVAIL\\RepositoriesGithub\\Simu-Bacteria-Holograms\\FOCUS_REPORT\\DENSE\\holograms\\N200",
+    "nb_objects": 200,
+    "holo_size_xy": 1024,
+    "border": 256,
+    "upscale_factor": 2,
+    "z_size": 200,
+    "z_step": 5e-07,
+    "length_min": 1.5e-06,
+    "length_max": 2e-06,
+    "thickness_min": 8e-07,
+    "thickness_max": 8e-07,
+    "pix_size": 7e-06,
+    "magnification": 40,
+    "index_medium": 1.33,
+    "index_object": 1.335,
+    "wavelength": 6.6e-07,
+    "illumination_mean": 1.0,
+    "sensor_noise_std_min": 0.015,
+    "sensor_noise_std_max": 0.015,
+    "number_of_sources": 1,
+    "sources_angle_azimuth": [
+        0.0
+    ],
+    "sources_angle_polar": [
+        0.0
+    ],
+    "distance_volume_camera": 9.999999999999999e-06,
+    "save_options": {
+        "hologram_bmp": true,
+        "hologram_npy": true,
+        "positions_csv": true,
+        "holo_ref": true,
+        "propagated_tiff": false,
+        "segmentation_tiff": false
+    },
+    "holo_ref_nb_planes": 16,
+    "config_file": null,
+    "radius_min": 5e-07,
+    "radius_max": 2e-06,
+    "volume_smoothing": {
+        "enabled": false,
+        "method": "gaussian",
+        "sigma": 0.5,
+        "sdf_width": 1.0
+    }
+}

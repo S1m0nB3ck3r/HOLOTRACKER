@@ -1,0 +1,9 @@
+seuil,detection,K,detections_par_image,trajectoires,persistance,longueur_mediane,persistantes_par_image
+global,CCL,15.0,72.25,144,0.9477508650519031,13.5,68.475
+global,maxima,15.0,74.6,145,0.9564343163538874,15.0,71.35
+local sigma,CCL,20.0,93.875,178,0.9342210386151798,14.5,87.7
+local sigma,maxima,20.0,98.575,200,0.9457266041085468,13.0,93.225
+local MAD,CCL,25.0,91.7,169,0.928298800436205,16.0,85.125
+local MAD,maxima,20.0,111.2,237,0.9255845323741008,9.0,102.925
+local mediane,CCL,8.0,124.225,283,0.8589253370899578,7.0,106.7
+local mediane,maxima,8.0,144.625,362,0.8964563526361279,6.0,129.65
