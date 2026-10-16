@@ -4,7 +4,7 @@ Filename: test_pipeline.py
 
 Description:
 Test de non-régression du pipeline de localisation. Rejoue le pipeline complet sur la
-première image de Film REF/cleaned, avec des paramètres figés, et compare au fichier
+première image de Film REF/bacteria/cleaned, avec des paramètres figés, et compare au fichier
 étalon tests/reference/expected.json.
 
 C'est un test de CARACTÉRISATION: il fige le comportement actuel, il ne démontre pas que

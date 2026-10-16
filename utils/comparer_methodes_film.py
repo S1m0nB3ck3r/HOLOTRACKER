@@ -56,7 +56,8 @@ import benchmark_detection as banc
 K = {"global + CCL": 15.0, "local + CCL": 20.0, "local mediane + CCL": 8.0,
      "local + maxima": 20.0}
 
-FILM = os.path.join(RACINE, "Film REF")
+# Le film est range par sequence depuis le 2026-10-16: les bmp sont dans bacteria/.
+FILM = os.path.join(RACINE, "Film REF", "bacteria")
 RAYON_CHAINAGE = 5e-6           # deplacement maximal entre deux images, en metres
 MEMOIRE = 1                     # images d'absence tolerees par trackpy
 LONGUEUR_MINIMALE = 3           # une trajectoire credible

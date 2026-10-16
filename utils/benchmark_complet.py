@@ -227,7 +227,8 @@ def mesure_simulation(chaine):
 
 
 def mesure_film(chaine, meilleurs, nb_images):
-    film = os.path.join(RACINE, "Film REF")
+    # Le film est range par sequence depuis le 2026-10-16: les bmp sont dans bacteria/.
+    film = os.path.join(RACINE, "Film REF", "bacteria")
     images = sorted(i for i in os.listdir(film) if i.lower().endswith(".bmp"))[:nb_images]
     h_moyen = np.load(os.path.join(film, "mean", "mean_holo.npy"))
     collecte = {cle: [] for cle in meilleurs}

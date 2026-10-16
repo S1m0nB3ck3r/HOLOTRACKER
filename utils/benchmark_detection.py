@@ -7,8 +7,8 @@ Description:
 Rappel et precision des deux methodes de detection, sur les hologrammes simules de
 'holograms simules/', dont la verite terrain est connue.
 
-    seuil global + CCL3D   -> ce que fait script_localisation_pipeline.py
-    seuil local + maxima   -> ce que fait script_localisation_pipeline_local_maxima.py
+    seuil global + CCL3D   -> script_localisation_pipeline_global_CCL.py
+    seuil local + maxima   -> script_localisation_pipeline_local_sigma_maxima.py
 
 Les deux partagent le meme volume de focus: il est calcule une fois par hologramme, seule
 l'etape de detection change. Les parametres ci-dessous recopient ceux des deux scripts; les
@@ -71,13 +71,13 @@ FILTRE = (15, 125)
 TYPE_FOCUS = Focus_type.SUM_OF_VARIANCE
 SUM_SIZE = 15
 
-K_GLOBAL = 11.0                 # script_localisation_pipeline.py
+K_GLOBAL = 11.0                 # script_localisation_pipeline_global_CCL.py en porte 15
 CONNECTIVITE = 26
 MIN_VOXEL = 0                   # 0 = pas de filtre sur la taille
 
-K_LOCAL_CCL = 20.0              # script_localisation_pipeline_local_CCL.py
+K_LOCAL_CCL = 20.0              # script_localisation_pipeline_local_sigma_CCL.py
 K_MEDIANE = 6.0                 # seuil = fond median x (1 + K); autre echelle que les K ci-dessus
-K_MAXIMA = 15.0                 # script_localisation_pipeline_local_maxima.py
+K_MAXIMA = 15.0                 # script_localisation_pipeline_local_sigma_maxima.py en porte 20
 MAILLE_XY, MAILLE_Z = 64, 25
 KAPPA, NB_PASSES, PERCENTILE = 3.0, 3, 10
 PAS_ECHANTILLON = 1

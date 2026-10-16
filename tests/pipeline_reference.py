@@ -74,8 +74,9 @@ def load_params():
 
 
 def test_image_path():
-    """Première image de Film REF/cleaned (l'ordre alphabétique des .tif, pas des .csv)."""
-    directory = os.path.join(PROJECT_ROOT, "Film REF", "cleaned")
+    """Première image de Film REF/bacteria/cleaned (ordre alphabétique des .tif)."""
+    # Le film est rangé par séquence depuis le 2026-10-16 : les images sont dans bacteria/.
+    directory = os.path.join(PROJECT_ROOT, "Film REF", "bacteria", "cleaned")
     images = sorted(f for f in os.listdir(directory) if f.lower().endswith(".tif"))
     if not images:
         raise FileNotFoundError(f"Aucune image .tif dans {directory}")

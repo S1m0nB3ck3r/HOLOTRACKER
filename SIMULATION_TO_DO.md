@@ -105,7 +105,7 @@ passé à 7 µm. Rien à changer de votre côté sur ce point.
 
 - **si les trois méthodes se valent à toutes les densités** : rien n'est ajouté à
   l'interface, le seuil global reste seul, et les maxima locaux sont écrits comme **script
-  hors interface** à côté de `code_locate/script_localisation_pipeline.py`, pour qui veut
+  hors interface** à côté des autres `code_locate/script_localisation_pipeline_*.py`, pour qui veut
   les essayer. Fin du chantier ;
 - **si l'écart revient à faible densité** (le N = 10 de votre table TENEGRAD montre 0,80
   contre 0,97, soit 17 points) : on construit **la seule méthode qui gagne**, pas un menu à

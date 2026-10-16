@@ -72,9 +72,10 @@ def produire_csv_locate(repertoire_travail, seuil=None):
     ne couvrirait jamais le defaut des lignes fantomes: toutes les images de reference ont
     des detections.
     """
-    source = sorted(glob.glob(os.path.join(PROJECT_ROOT, "Film REF", "cleaned", "*.tif")))
+    # Le film est range par sequence depuis le 2026-10-16: bacteria/cleaned.
+    source = sorted(glob.glob(os.path.join(PROJECT_ROOT, "Film REF", "bacteria", "cleaned", "*.tif")))
     if len(source) < NB_HOLOGRAMMES:
-        raise FileNotFoundError("Pas assez d'images dans Film REF/cleaned")
+        raise FileNotFoundError("Pas assez d'images dans Film REF/bacteria/cleaned")
     for chemin in source[:NB_HOLOGRAMMES]:
         shutil.copy(chemin, repertoire_travail)
 

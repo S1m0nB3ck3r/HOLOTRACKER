@@ -20,7 +20,7 @@
     "connectivity": "26",
     "min_voxel": "0",
     "max_voxel": "0",
-    "holograms_directory": "Film REF/cleaned",
+    "holograms_directory": "Film REF/bacteria/cleaned",
     "image_type": "TIF",
     "additional_display": "Segmentation + Centroid",
     "threshold_mode": "global"
