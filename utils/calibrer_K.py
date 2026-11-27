@@ -5,7 +5,7 @@ Filename: calibrer_K.py
 
 Description:
 Cherche le meilleur K de chacune des trois methodes de detection, sur les hologrammes
-simules de 'holograms simules/' dont la verite terrain est connue.
+simules de 'SIMULATED HOLO/' dont la verite terrain est connue.
 
 HOLOTRACKER applique **un seul K a tout un film**, quelle que soit la densite. Le K retenu
 ici est donc celui qui maximise le F1 **moyen sur toutes les densites**, et non le meilleur
@@ -18,7 +18,7 @@ abordable.
 
 Usage:
     python utils/calibrer_K.py
-    python utils/calibrer_K.py "holograms simules"
+    python utils/calibrer_K.py "SIMULATED HOLO"
 
 Les resultats sont ecrits dans <repertoire>/calibration_K.csv, une ligne par
 (densite, methode, K).
@@ -29,8 +29,6 @@ mail: simon.becker@univ-lorraine.fr
 License: GNU General Public License v3.0
 """
 
-import glob
-import json
 import os
 import sys
 
@@ -76,21 +74,9 @@ def main(racine_holo):
     boite = taille_boite_voxels(banc.BOITE_XY, banc.BOITE_Z, banc.DX, banc.DZ)
 
     lignes = []
-    for dossier_densite in sorted(glob.glob(os.path.join(racine_holo, "N*"))):
-        sous = [d for d in glob.glob(os.path.join(dossier_densite, "*")) if os.path.isdir(d)]
-        if not sous:
-            continue
-        dossier = sous[0]
-        config = json.load(open(os.path.join(dossier, "config_simu.json")))
-        distance = float(config["distance_volume_camera"])
-        holos = sorted(glob.glob(os.path.join(dossier, "simulated_hologram", "*.npy")))
-
-        for chemin in holos:
-            base = os.path.basename(chemin).replace("holo_", "", 1)[:-4]
-            ref = os.path.join(dossier, "holo_ref", "holo_ref_{}.npy".format(base))
-            vrai, phi = banc.lire_verite(dossier, base, distance)
-
-            h_net = np.load(chemin).astype(np.float32) / np.load(ref).astype(np.float32)
+    for dossier in banc.dossiers_simulation(racine_holo):
+        for n in banc.numeros_hologrammes(dossier):
+            h_net, vrai, phi = banc.lire_simulation(dossier, n)
             propag.volume_propag_angular_spectrum_to_module(
                 cp.asarray(h_net), *bufs, d_volume,
                 banc.WAVELENGTH / banc.INDEX_MEDIUM, banc.MAGNIFICATION, banc.PIX_SIZE,
@@ -159,14 +145,14 @@ def main(racine_holo):
                 for nom, f in zip(banc.METHODES, (f_glob, f_loc, f_med, f_max)):
                     s = banc.scores(f[:, 1:4] if len(f) else np.zeros((0, 3)), vrai, phi)
                     lignes.append({
-                        "densite": len(vrai), "hologramme": base, "methode": nom,
+                        "densite": len(vrai), "hologramme": n, "methode": nom,
                         "K": K_med if nom.startswith("local mediane") else K,
                         "rappel": s["rappel"], "precision": s["precision"],
                         "rappel_couchees": s["rappel_couchees"],
                         "detections": s["nb_detections"],
                         "f1": f1(s["rappel"], s["precision"])})
             print("  {} {} : {} K balayes".format(
-                os.path.basename(dossier_densite), base, len(GRILLE_K)))
+                os.path.basename(os.path.dirname(dossier)), n, len(GRILLE_K)))
 
     df = pd.DataFrame(lignes)
     sortie = os.path.join(racine_holo, "calibration_K.csv")
@@ -211,5 +197,5 @@ def main(racine_holo):
 
 
 if __name__ == "__main__":
-    chemin = sys.argv[1] if len(sys.argv) > 1 else os.path.join(RACINE, "holograms simules")
+    chemin = sys.argv[1] if len(sys.argv) > 1 else os.path.join(RACINE, "SIMULATED HOLO")
     sys.exit(main(chemin))

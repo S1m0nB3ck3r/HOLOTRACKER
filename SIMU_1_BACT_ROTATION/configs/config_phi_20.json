@@ -1,0 +1,49 @@
+{
+    "mode": "bacteria_list",
+    "nb_holo": 1,
+    "holo_size_xy": 1024,
+    "border": 512,
+    "upscale_factor": 2,
+    "z_size": 100,
+    "z_step": 1e-07,
+    "pix_size": 5.5e-06,
+    "magnification": 40.0,
+    "index_medium": 1.33,
+    "index_object": 1.354,
+    "wavelength": 6.6e-07,
+    "illumination_mean": 10.0,
+    "sensor_noise_std_min": 0.015,
+    "sensor_noise_std_max": 0.015,
+    "number_of_sources": 1,
+    "sources_angle_azimuth": [
+        0.0
+    ],
+    "sources_angle_polar": [
+        0.0
+    ],
+    "distance_volume_camera": 4.5e-05,
+    "holo_ref_nb_planes": 10,
+    "save_options": {
+        "hologram_bmp": true,
+        "hologram_tiff": true,
+        "hologram_npy": false,
+        "propagated_tiff": false,
+        "propagated_npy": false,
+        "segmentation_tiff": false,
+        "segmentation_npy": false,
+        "positions_csv": true,
+        "holo_ref": true
+    },
+    "output_dir": "C:\\TRAVAIL\\RepositoriesGithub\\Simu-Bacteria-Holograms\\SIMU_1_BACT_ROTATION\\phi_20",
+    "bacteria": [
+        {
+            "pos_x": 7.04e-05,
+            "pos_y": 7.04e-05,
+            "pos_z": 5e-06,
+            "length": 1.5e-06,
+            "thickness": 8e-07,
+            "theta": 0.0,
+            "phi": 20.0
+        }
+    ]
+}

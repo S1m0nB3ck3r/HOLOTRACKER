@@ -4,32 +4,40 @@
 Filename: benchmark_detection.py
 
 Description:
-Rappel et precision des deux methodes de detection, sur les hologrammes simules de
-'holograms simules/', dont la verite terrain est connue.
+Rappel et precision des methodes de detection, sur les hologrammes simules de
+'SIMULATED HOLO/', dont la verite terrain est connue.
 
     seuil global + CCL3D   -> script_localisation_pipeline_global_CCL.py
     seuil local + maxima   -> script_localisation_pipeline_local_sigma_maxima.py
 
-Les deux partagent le meme volume de focus: il est calcule une fois par hologramme, seule
-l'etape de detection change. Les parametres ci-dessous recopient ceux des deux scripts; les
+Les methodes partagent le meme volume de focus: il est calcule une fois par hologramme, seule
+l'etape de detection change. Les parametres ci-dessous recopient ceux des scripts; les
 modifier ici ne change rien aux scripts, et reciproquement.
 
-Trois conventions de la simulation, trouvees en comparant les positions et verifiees a
-chaque execution (voir l'ecart median affiche):
+Les simulations viennent du simulateur GUI du projet Simu-Bacteria-Holograms. Un dossier
+par densite, N10/<date>/, qui contient:
 
-  - le simulateur ecrit l'objet en tableau[x_voxel, y_voxel], donc son x_position_m
-    correspond a notre Y (indice de ligne) et son y_position_m a notre X ;
-  - son z_position_m est compte depuis le premier plan du volume simule, alors que nos
+    parameters_simu_bact.json          les parametres de la simulation
+    simulated_hologram/holo_<n>.npy    l'hologramme n (flottant, fond a illumination_mean)
+    object_positions/bact_<n>.csv      ses objets: x_position_m, y_position_m, z_position_m...
+
+Conventions de lecture, verifiees a chaque execution par le biais de position affiche:
+
+  - X est l'axe horizontal de l'image (colonnes), Y l'axe vertical (lignes, vers le bas),
+    dans HOLOTRACKER comme dans le simulateur depuis le 2026-11-27: x_position_m se lit
+    directement comme notre X, y_position_m comme notre Y. Les simulations plus anciennes
+    avaient X et Y echanges et ne doivent plus etre utilisees ;
+  - z_position_m est compte depuis le premier plan du volume simule, alors que nos
     scripts reconstruisent depuis la camera: il faut ajouter distance_volume_camera ;
-  - l'hologramme se nettoie en le divisant par son holo_ref, qui est l'illumination sans
-    objet.
+  - l'illumination simulee est uniforme et il n'y a pas d'hologramme de reference:
+    l'hologramme se nettoie en le divisant par sa propre moyenne.
 
 Un objet est considere retrouve si une detection est a moins de 3 um en XY et 5 um en Z,
 comme dans les mesures du projet Simu-Bacteria-Holograms.
 
 Usage:
     python utils/benchmark_detection.py
-    python utils/benchmark_detection.py "holograms simules"
+    python utils/benchmark_detection.py "SIMULATED HOLO"
 
 Author: Simon BECKER
 mail: simon.becker@univ-lorraine.fr
@@ -92,13 +100,48 @@ TOL_XY, TOL_Z = 3e-6, 5e-6
 ANGLE_COUCHEE = 60.0            # phi au-dela duquel la bacterie est dite couchee
 
 
-def lire_verite(dossier, base, distance_volume_camera):
-    """Positions vraies, ramenees dans la convention d'HOLOTRACKER (metres)."""
-    v = pd.read_csv(os.path.join(dossier, "object_positions", "bacteria_{}.csv".format(base)))
-    positions = np.stack([v["y_position_m"].to_numpy(),            # leur y est notre X
-                          v["x_position_m"].to_numpy(),            # leur x est notre Y
-                          v["z_position_m"].to_numpy() + distance_volume_camera], axis=1)
-    return positions, v["phi_angle"].to_numpy()
+def dossiers_simulation(racine_holo):
+    """Un dossier de simulation par densite (N10/<date>/, N20/<date>/...), par N croissant."""
+    dossiers = []
+    for dossier_densite in sorted(glob.glob(os.path.join(racine_holo, "N*")),
+                                  key=lambda d: int(os.path.basename(d)[1:])):
+        sous = sorted(d for d in glob.glob(os.path.join(dossier_densite, "*"))
+                      if os.path.isdir(d))
+        if sous:
+            dossiers.append(sous[-1])          # la simulation la plus recente
+    return dossiers
+
+
+def numeros_hologrammes(dossier):
+    """Numeros n des hologrammes simulated_hologram/holo_<n>.npy d'un dossier, dans l'ordre."""
+    chemins = glob.glob(os.path.join(dossier, "simulated_hologram", "holo_*.npy"))
+    return sorted(int(os.path.basename(c)[len("holo_"):-len(".npy")]) for c in chemins)
+
+
+def lire_simulation(dossier, n):
+    """Hologramme n nettoye, positions vraies (metres, repere HOLOTRACKER) et angle phi.
+
+    Refuse une simulation dont l'optique differe de celle des parametres ci-dessus: les
+    positions reconstruites n'y seraient pas comparables aux positions vraies.
+    """
+    p = json.load(open(os.path.join(dossier, "parameters_simu_bact.json")))
+    for cle, attendu in (("pix_size", PIX_SIZE), ("grossissement", MAGNIFICATION),
+                         ("wavelength", WAVELENGTH), ("index_milieu", INDEX_MEDIUM),
+                         ("holo_size_xy", NB_PIX_X)):
+        if not np.isclose(float(p[cle]), attendu, rtol=1e-6):
+            raise ValueError("{} : {} = {} dans la simulation, {} ici".format(
+                dossier, cle, p[cle], attendu))
+
+    h = np.load(os.path.join(dossier, "simulated_hologram", "holo_{}.npy".format(n)))
+    h = h.astype(np.float32)
+    h_net = h / h.mean()                       # illumination uniforme, pas de holo_ref
+
+    v = pd.read_csv(os.path.join(dossier, "object_positions", "bact_{}.csv".format(n)))
+    positions = np.stack([v["x_position_m"].to_numpy(),            # X : colonnes
+                          v["y_position_m"].to_numpy(),            # Y : lignes
+                          v["z_position_m"].to_numpy() + float(p["distance_volume_camera"])],
+                         axis=1)
+    return h_net, positions, v["phi_angle"].to_numpy()
 
 
 def apparie(detections, vrai):
@@ -160,23 +203,13 @@ def main(racine_holo):
         "N", "holos", "methode", "rappel", "precision", "couchees", "detect."))
 
     resultats = []
-    for dossier_densite in sorted(glob.glob(os.path.join(racine_holo, "N*"))):
-        sous = [d for d in glob.glob(os.path.join(dossier_densite, "*")) if os.path.isdir(d)]
-        if not sous:
-            continue
-        dossier = sous[0]
-        config = json.load(open(os.path.join(dossier, "config_simu.json")))
-        distance_volume_camera = float(config["distance_volume_camera"])
-        holos = sorted(glob.glob(os.path.join(dossier, "simulated_hologram", "*.npy")))
+    for dossier in dossiers_simulation(racine_holo):
+        holos = numeros_hologrammes(dossier)
 
         acc = {nom: [] for nom in METHODES}
         ecarts = {nom: [] for nom in METHODES}
-        for chemin in holos:
-            base = os.path.basename(chemin).replace("holo_", "", 1)[:-4]
-            ref = os.path.join(dossier, "holo_ref", "holo_ref_{}.npy".format(base))
-            vrai, phi = lire_verite(dossier, base, distance_volume_camera)
-
-            h_net = np.load(chemin).astype(np.float32) / np.load(ref).astype(np.float32)
+        for n in holos:
+            h_net, vrai, phi = lire_simulation(dossier, n)
             propag.volume_propag_angular_spectrum_to_module(
                 cp.asarray(h_net), *bufs, d_volume,
                 WAVELENGTH / INDEX_MEDIUM, MAGNIFICATION, PIX_SIZE, NB_PIX_X, NB_PIX_Y,
@@ -256,5 +289,5 @@ def main(racine_holo):
 
 
 if __name__ == "__main__":
-    chemin = sys.argv[1] if len(sys.argv) > 1 else os.path.join(RACINE, "holograms simules")
+    chemin = sys.argv[1] if len(sys.argv) > 1 else os.path.join(RACINE, "SIMULATED HOLO")
     sys.exit(main(chemin))

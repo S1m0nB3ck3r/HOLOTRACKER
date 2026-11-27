@@ -1,0 +1,138 @@
+volume 240 plans de 0.5 um depuis 0.0 um, filtre (15, 0), SUM_OF_GRADIENT sum_size 15, mailles 25 x 64 x 64
+   N = 10 hologramme 0 fait
+   N = 10 hologramme 1 fait
+   N = 10 hologramme 2 fait
+   N = 10 hologramme 3 fait
+   N = 10 hologramme 4 fait
+   N = 10 hologramme 5 fait
+   N = 10 hologramme 6 fait
+   N = 10 hologramme 7 fait
+   N = 10 hologramme 8 fait
+   N = 10 hologramme 9 fait
+   N = 20 hologramme 0 fait
+   N = 20 hologramme 1 fait
+   N = 20 hologramme 2 fait
+   N = 20 hologramme 3 fait
+   N = 20 hologramme 4 fait
+   N = 20 hologramme 5 fait
+   N = 20 hologramme 6 fait
+   N = 20 hologramme 7 fait
+   N = 20 hologramme 8 fait
+   N = 20 hologramme 9 fait
+   N = 50 hologramme 0 fait
+   N = 50 hologramme 1 fait
+   N = 50 hologramme 2 fait
+   N = 50 hologramme 3 fait
+   N = 50 hologramme 4 fait
+   N = 50 hologramme 5 fait
+   N = 50 hologramme 6 fait
+   N = 50 hologramme 7 fait
+   N = 50 hologramme 8 fait
+   N = 50 hologramme 9 fait
+   N = 100 hologramme 0 fait
+   N = 100 hologramme 1 fait
+   N = 100 hologramme 2 fait
+   N = 100 hologramme 3 fait
+   N = 100 hologramme 4 fait
+   N = 100 hologramme 5 fait
+   N = 100 hologramme 6 fait
+   N = 100 hologramme 7 fait
+   N = 100 hologramme 8 fait
+   N = 100 hologramme 9 fait
+   N = 200 hologramme 0 fait
+   N = 200 hologramme 1 fait
+   N = 200 hologramme 2 fait
+   N = 200 hologramme 3 fait
+   N = 200 hologramme 4 fait
+   N = 200 hologramme 5 fait
+   N = 200 hologramme 6 fait
+   N = 200 hologramme 7 fait
+   N = 200 hologramme 8 fait
+   N = 200 hologramme 9 fait
+   N = 300 hologramme 0 fait
+   N = 300 hologramme 1 fait
+   N = 300 hologramme 2 fait
+   N = 300 hologramme 3 fait
+   N = 300 hologramme 4 fait
+   N = 300 hologramme 5 fait
+   N = 300 hologramme 6 fait
+   N = 300 hologramme 7 fait
+   N = 300 hologramme 8 fait
+   N = 300 hologramme 9 fait
+   N = 400 hologramme 0 fait
+   N = 400 hologramme 1 fait
+   N = 400 hologramme 2 fait
+   N = 400 hologramme 3 fait
+   N = 400 hologramme 4 fait
+   N = 400 hologramme 5 fait
+   N = 400 hologramme 6 fait
+   N = 400 hologramme 7 fait
+   N = 400 hologramme 8 fait
+   N = 400 hologramme 9 fait
+   N = 500 hologramme 0 fait
+   N = 500 hologramme 1 fait
+   N = 500 hologramme 2 fait
+   N = 500 hologramme 3 fait
+   N = 500 hologramme 4 fait
+   N = 500 hologramme 5 fait
+   N = 500 hologramme 6 fait
+   N = 500 hologramme 7 fait
+   N = 500 hologramme 8 fait
+   N = 500 hologramme 9 fait
+
+global  (K unique 12.86: F1 moyen 0.895 ; K par densite: F1 moyen 0.944)
+     N   K opt  precision  rappel     F1  couchees  debout F1 K uniq  X biais/sigma um  Y biais/sigma um  Z biais/sigma um
+    10    22.2      0.991   1.000  0.995     1.000   1.000     0.867     0.001/0.037       0.004/0.039      -0.061/0.122  
+    20   16.89      0.972   0.995  0.983     0.991   1.000     0.956    -0.002/0.038      -0.001/0.052      -0.080/0.148  
+    50   12.86      0.978   0.954  0.966     0.952   0.987     0.966    -0.005/0.049      -0.001/0.097      -0.067/0.239  
+   100    9.79      0.973   0.956  0.964     0.941   0.973     0.963     0.004/0.091       0.002/0.092      -0.061/0.223  
+   200    9.79      0.982   0.926  0.953     0.893   0.973     0.928     0.000/0.119       0.004/0.096      -0.055/0.332  
+   300    9.79      0.984   0.866  0.921     0.811   0.953     0.876    -0.000/0.119      -0.002/0.123      -0.040/0.326  
+   400    7.45      0.907   0.885  0.896     0.842   0.952     0.826    -0.001/0.148       0.003/0.136      -0.069/0.417  
+   500    7.45      0.913   0.844  0.877     0.798   0.923     0.779    -0.000/0.137      -0.002/0.134      -0.054/0.418  
+
+local sigma  (K unique 16.89: F1 moyen 0.951 ; K par densite: F1 moyen 0.966)
+     N   K opt  precision  rappel     F1  couchees  debout F1 K uniq  X biais/sigma um  Y biais/sigma um  Z biais/sigma um
+    10   29.16      1.000   1.000  1.000     1.000   1.000     0.957     0.003/0.048      -0.002/0.047      -0.044/0.154  
+    20    22.2      0.968   1.000  0.983     1.000   1.000     0.970    -0.001/0.048       0.001/0.062      -0.072/0.155  
+    50    22.2      0.981   0.970  0.975     0.964   1.000     0.966    -0.005/0.063      -0.004/0.079      -0.053/0.167  
+   100   16.89      0.977   0.981  0.979     0.977   0.991     0.979     0.002/0.074      -0.001/0.074      -0.067/0.203  
+   200   16.89      0.982   0.964  0.972     0.948   0.990     0.972    -0.001/0.105       0.004/0.082      -0.064/0.286  
+   300   16.89      0.988   0.915  0.950     0.880   0.968     0.950    -0.002/0.108       0.003/0.113      -0.048/0.294  
+   400   12.86      0.960   0.922  0.940     0.888   0.973     0.925     0.000/0.122       0.001/0.122      -0.064/0.318  
+   500   12.86      0.967   0.889  0.927     0.849   0.960     0.890     0.000/0.132      -0.003/0.123      -0.055/0.346  
+
+local MAD  (K unique 22.2: F1 moyen 0.935 ; K par densite: F1 moyen 0.964)
+     N   K opt  precision  rappel     F1  couchees  debout F1 K uniq  X biais/sigma um  Y biais/sigma um  Z biais/sigma um
+    10   29.16      0.982   1.000  0.990     1.000   1.000     0.987     0.001/0.036      -0.002/0.044      -0.032/0.147  
+    20   29.16      0.981   0.990  0.985     0.982   1.000     0.979     0.000/0.050      -0.002/0.055      -0.060/0.155  
+    50    22.2      0.968   0.974  0.970     0.972   1.000     0.970    -0.005/0.061      -0.006/0.082      -0.046/0.175  
+   100    22.2      0.983   0.967  0.975     0.953   0.991     0.975     0.001/0.076      -0.002/0.076      -0.058/0.190  
+   200   16.89      0.981   0.961  0.971     0.948   0.983     0.962    -0.001/0.105       0.005/0.087      -0.053/0.278  
+   300   16.89      0.979   0.921  0.949     0.886   0.970     0.917    -0.005/0.126      -0.001/0.121      -0.040/0.358  
+   400   12.86      0.962   0.920  0.940     0.887   0.973     0.870    -0.000/0.128      -0.001/0.126      -0.068/0.358  
+   500   12.86      0.971   0.890  0.928     0.849   0.955     0.822    -0.000/0.136      -0.003/0.124      -0.062/0.357  
+
+local mediane  (K unique 4.078: F1 moyen 0.945 ; K par densite: F1 moyen 0.965)
+     N   K opt  precision  rappel     F1  couchees  debout F1 K uniq  X biais/sigma um  Y biais/sigma um  Z biais/sigma um
+    10    7.83      1.000   1.000  1.000     1.000   1.000     0.945     0.001/0.034       0.002/0.039      -0.043/0.153  
+    20    7.83      0.986   0.990  0.988     0.982   1.000     0.965    -0.002/0.039      -0.003/0.052      -0.067/0.147  
+    50    5.65      0.983   0.972  0.977     0.976   0.987     0.949    -0.006/0.059      -0.003/0.097      -0.062/0.244  
+   100    5.65      0.987   0.960  0.973     0.945   0.991     0.969     0.001/0.078      -0.000/0.075      -0.059/0.212  
+   200   4.078      0.983   0.958  0.970     0.945   0.983     0.970     0.001/0.123       0.006/0.096      -0.048/0.355  
+   300   4.078      0.981   0.916  0.948     0.880   0.968     0.948    -0.002/0.115      -0.003/0.125      -0.040/0.353  
+   400   2.943      0.944   0.927  0.935     0.900   0.973     0.923     0.002/0.149      -0.000/0.145      -0.073/0.450  
+   500   2.943      0.955   0.900  0.926     0.865   0.960     0.892    -0.000/0.145      -0.002/0.141      -0.059/0.440  
+
+Temps median par hologramme (ms)
+etape
+mailles local MAD         19.0
+mailles local mediane     10.0
+mailles local sigma      258.0
+seuil global             415.0
+seuil local MAD          167.0
+seuil local mediane      167.0
+seuil local sigma        167.0
+
+resultats dans C:\TRAVAIL\RepositoriesGithub\HOLOTRACKER\report_threshold_benchmarch_dense_bacteria_holo
+exit 0

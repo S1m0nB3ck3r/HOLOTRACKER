@@ -1,0 +1,2 @@
+thickness,length,x_position_m,y_position_m,z_position_m,x_voxel,y_voxel,z_voxel,theta_angle,phi_angle
+8e-07,1.5e-06,7.04e-05,7.04e-05,5e-06,512,512,50,0.0,25.0

@@ -1,0 +1,9 @@
+
+focus                    K    plateau F1 max     F1  trouves    |eX| um    |eY| um    |eZ| um  focus (ms)
+SUM_OF_VARIANCE      64.36    10.91-323.18 (x29.6)  1.000    19/19      0.004      0.003      0.039         399
+TENEGRAD             39.66       20.8-64.36 (x3.1)  1.000    19/19      0.005      0.004      0.034         245
+SUM_OF_LAPLACIAN      20.8      12.82-33.75 (x2.6)  1.000    19/19      0.026      0.012      0.031         233
+SUM_OF_GRADIENT      88.88     20.8-323.18 (x15.5)  1.000    19/19      0.006      0.003      0.037         279
+SUM_OF_INTENSITY     46.61    12.82-144.22 (x11.2)  1.000    19/19      0.005      0.004      0.040         185
+
+resultats dans c:\TRAVAIL\RepositoriesGithub\HOLOTRACKER\report_1_bact_rotation_focus

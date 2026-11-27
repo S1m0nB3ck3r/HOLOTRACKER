@@ -1,0 +1,30 @@
+19 angles, volume 200 plans de 0.20 um depuis 30.0 um, pixel objet 0.1375 um, sum_size 15
+   phi =  0.0 deg fait
+   phi =  5.0 deg fait
+   phi = 10.0 deg fait
+   phi = 15.0 deg fait
+   phi = 20.0 deg fait
+   phi = 25.0 deg fait
+   phi = 30.0 deg fait
+   phi = 35.0 deg fait
+   phi = 40.0 deg fait
+   phi = 45.0 deg fait
+   phi = 50.0 deg fait
+   phi = 55.0 deg fait
+   phi = 60.0 deg fait
+   phi = 65.0 deg fait
+   phi = 70.0 deg fait
+   phi = 75.0 deg fait
+   phi = 80.0 deg fait
+   phi = 85.0 deg fait
+   phi = 90.0 deg fait
+
+focus                    K       F1  trouves    |eX| (um)    |eY| (um)    |eZ| (um)  focus (ms)
+SUM_OF_VARIANCE     323.18    1.000    19/19        0.008        0.006        0.034         399
+TENEGRAD             33.75    1.000    19/19        0.005        0.006        0.034         245
+SUM_OF_LAPLACIAN      17.7    1.000    19/19        0.027        0.013        0.028         233
+SUM_OF_GRADIENT      46.61    1.000    19/19        0.004        0.004        0.034         279
+SUM_OF_INTENSITY    104.44    1.000    19/19        0.004        0.004        0.031         185
+
+resultats dans c:\TRAVAIL\RepositoriesGithub\HOLOTRACKER\report_1_bact_rotation_focus
+exit 0

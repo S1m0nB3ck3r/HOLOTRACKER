@@ -1,0 +1,139 @@
+volume 240 plans de 0.5 um depuis 0.0 um, filtre (15, 0), sum_size 15, 16 K
+   N = 10 hologramme 0 fait
+   N = 10 hologramme 1 fait
+   N = 10 hologramme 2 fait
+   N = 10 hologramme 3 fait
+   N = 10 hologramme 4 fait
+   N = 10 hologramme 5 fait
+   N = 10 hologramme 6 fait
+   N = 10 hologramme 7 fait
+   N = 10 hologramme 8 fait
+   N = 10 hologramme 9 fait
+   N = 20 hologramme 0 fait
+   N = 20 hologramme 1 fait
+   N = 20 hologramme 2 fait
+   N = 20 hologramme 3 fait
+   N = 20 hologramme 4 fait
+   N = 20 hologramme 5 fait
+   N = 20 hologramme 6 fait
+   N = 20 hologramme 7 fait
+   N = 20 hologramme 8 fait
+   N = 20 hologramme 9 fait
+   N = 50 hologramme 0 fait
+   N = 50 hologramme 1 fait
+   N = 50 hologramme 2 fait
+   N = 50 hologramme 3 fait
+   N = 50 hologramme 4 fait
+   N = 50 hologramme 5 fait
+   N = 50 hologramme 6 fait
+   N = 50 hologramme 7 fait
+   N = 50 hologramme 8 fait
+   N = 50 hologramme 9 fait
+   N = 100 hologramme 0 fait
+   N = 100 hologramme 1 fait
+   N = 100 hologramme 2 fait
+   N = 100 hologramme 3 fait
+   N = 100 hologramme 4 fait
+   N = 100 hologramme 5 fait
+   N = 100 hologramme 6 fait
+   N = 100 hologramme 7 fait
+   N = 100 hologramme 8 fait
+   N = 100 hologramme 9 fait
+   N = 200 hologramme 0 fait
+   N = 200 hologramme 1 fait
+   N = 200 hologramme 2 fait
+   N = 200 hologramme 3 fait
+   N = 200 hologramme 4 fait
+   N = 200 hologramme 5 fait
+   N = 200 hologramme 6 fait
+   N = 200 hologramme 7 fait
+   N = 200 hologramme 8 fait
+   N = 200 hologramme 9 fait
+   N = 300 hologramme 0 fait
+   N = 300 hologramme 1 fait
+   N = 300 hologramme 2 fait
+   N = 300 hologramme 3 fait
+   N = 300 hologramme 4 fait
+   N = 300 hologramme 5 fait
+   N = 300 hologramme 6 fait
+   N = 300 hologramme 7 fait
+   N = 300 hologramme 8 fait
+   N = 300 hologramme 9 fait
+   N = 400 hologramme 0 fait
+   N = 400 hologramme 1 fait
+   N = 400 hologramme 2 fait
+   N = 400 hologramme 3 fait
+   N = 400 hologramme 4 fait
+   N = 400 hologramme 5 fait
+   N = 400 hologramme 6 fait
+   N = 400 hologramme 7 fait
+   N = 400 hologramme 8 fait
+   N = 400 hologramme 9 fait
+   N = 500 hologramme 0 fait
+   N = 500 hologramme 1 fait
+   N = 500 hologramme 2 fait
+   N = 500 hologramme 3 fait
+   N = 500 hologramme 4 fait
+   N = 500 hologramme 5 fait
+   N = 500 hologramme 6 fait
+   N = 500 hologramme 7 fait
+   N = 500 hologramme 8 fait
+   N = 500 hologramme 9 fait
+
+SUM_OF_VARIANCE  (K = 8.54, F1 moyen sur les densites 0.942)
+     N  precision  rappel     F1  couchees  debout  X biais +/- sigma um  Y biais +/- sigma um  Z biais +/- sigma um
+    10      0.887   0.980  0.926     1.000   0.947        0.002 +/-0.024        0.000 +/-0.027       -0.072 +/-0.153
+    20      0.918   1.000  0.953     1.000   1.000       -0.001 +/-0.046       -0.003 +/-0.063       -0.106 +/-0.197
+    50      0.973   0.978  0.975     0.972   0.987       -0.005 +/-0.051       -0.005 +/-0.094       -0.075 +/-0.196
+   100      0.984   0.966  0.975     0.955   0.973       -0.001 +/-0.081       -0.003 +/-0.094       -0.068 +/-0.243
+   200      0.986   0.944  0.965     0.924   0.986       -0.000 +/-0.118        0.003 +/-0.111       -0.074 +/-0.371
+   300      0.989   0.897  0.941     0.850   0.968       -0.002 +/-0.110       -0.003 +/-0.125       -0.050 +/-0.315
+   400      0.983   0.852  0.912     0.789   0.940       -0.001 +/-0.123       -0.000 +/-0.115       -0.063 +/-0.319
+   500      0.989   0.809  0.890     0.748   0.915       -0.002 +/-0.132       -0.001 +/-0.117       -0.064 +/-0.348
+
+TENEGRAD  (K = 8.54, F1 moyen sur les densites 0.681)
+     N  precision  rappel     F1  couchees  debout  X biais +/- sigma um  Y biais +/- sigma um  Z biais +/- sigma um
+    10      0.101   0.960  0.181     0.962   1.000       -0.027 +/-0.261       -0.021 +/-0.138       -0.118 +/-0.621
+    20      0.273   0.995  0.414     0.991   1.000       -0.005 +/-0.066        0.004 +/-0.078       -0.139 +/-0.360
+    50      0.722   0.968  0.819     0.960   0.974       -0.004 +/-0.081       -0.003 +/-0.172       -0.077 +/-0.377
+   100      0.897   0.950  0.923     0.932   0.973        0.004 +/-0.117       -0.001 +/-0.118       -0.065 +/-0.360
+   200      0.950   0.859  0.902     0.798   0.936       -0.001 +/-0.150        0.005 +/-0.120       -0.059 +/-0.396
+   300      0.948   0.739  0.830     0.636   0.898       -0.002 +/-0.156        0.004 +/-0.156       -0.046 +/-0.374
+   400      0.937   0.615  0.742     0.513   0.834       -0.003 +/-0.172        0.002 +/-0.171       -0.074 +/-0.356
+   500      0.928   0.483  0.634     0.396   0.697        0.001 +/-0.193        0.002 +/-0.190       -0.076 +/-0.384
+
+SUM_OF_LAPLACIAN  (K = 15.77, F1 moyen sur les densites 0.581)
+     N  precision  rappel     F1  couchees  debout  X biais +/- sigma um  Y biais +/- sigma um  Z biais +/- sigma um
+    10      0.823   0.760  0.776     0.698   0.895        0.010 +/-0.117        0.027 +/-0.085       -0.027 +/-0.138
+    20      0.756   0.600  0.655     0.609   0.700       -0.002 +/-0.098        0.003 +/-0.093       -0.034 +/-0.133
+    50      0.902   0.582  0.705     0.500   0.789       -0.004 +/-0.101        0.006 +/-0.110       -0.028 +/-0.134
+   100      0.915   0.573  0.703     0.520   0.708       -0.008 +/-0.128        0.005 +/-0.124       -0.049 +/-0.153
+   200      0.937   0.447  0.605     0.362   0.610        0.006 +/-0.141       -0.004 +/-0.148       -0.050 +/-0.257
+   300      0.927   0.339  0.496     0.268   0.553        0.000 +/-0.147        0.002 +/-0.140       -0.044 +/-0.223
+   400      0.926   0.259  0.404     0.195   0.522        0.002 +/-0.155        0.000 +/-0.151       -0.038 +/-0.290
+   500      0.910   0.183  0.304     0.120   0.418       -0.001 +/-0.179       -0.005 +/-0.177       -0.061 +/-0.259
+
+SUM_OF_GRADIENT  (K = 11.6, F1 moyen sur les densites 0.889)
+     N  precision  rappel     F1  couchees  debout  X biais +/- sigma um  Y biais +/- sigma um  Z biais +/- sigma um
+    10      0.690   0.980  0.792     1.000   0.947        0.002 +/-0.026        0.002 +/-0.034       -0.070 +/-0.174
+    20      0.808   1.000  0.887     1.000   1.000       -0.002 +/-0.040       -0.000 +/-0.061       -0.089 +/-0.168
+    50      0.971   0.962  0.966     0.964   0.987       -0.006 +/-0.063       -0.002 +/-0.094       -0.070 +/-0.276
+   100      0.989   0.946  0.967     0.924   0.982        0.002 +/-0.093       -0.001 +/-0.085       -0.059 +/-0.225
+   200      0.990   0.893  0.939     0.847   0.959       -0.003 +/-0.111        0.003 +/-0.085       -0.063 +/-0.289
+   300      0.992   0.822  0.899     0.746   0.938       -0.000 +/-0.111       -0.001 +/-0.118       -0.036 +/-0.280
+   400      0.991   0.751  0.854     0.663   0.897       -0.000 +/-0.116        0.002 +/-0.112       -0.061 +/-0.242
+   500      0.991   0.689  0.812     0.598   0.842       -0.001 +/-0.115       -0.001 +/-0.102       -0.056 +/-0.254
+
+SUM_OF_INTENSITY  (K = 8.54, F1 moyen sur les densites 0.840)
+     N  precision  rappel     F1  couchees  debout  X biais +/- sigma um  Y biais +/- sigma um  Z biais +/- sigma um
+    10      0.838   0.930  0.875     0.962   0.895        0.018 +/-0.224       -0.012 +/-0.090       -0.473 +/-0.979
+    20      0.922   0.975  0.947     0.964   0.950        0.003 +/-0.085       -0.008 +/-0.089       -0.365 +/-0.735
+    50      0.953   0.930  0.941     0.940   0.921       -0.010 +/-0.104        0.004 +/-0.158       -0.176 +/-0.560
+   100      0.964   0.912  0.937     0.875   0.965        0.005 +/-0.108        0.002 +/-0.134       -0.137 +/-0.481
+   200      0.978   0.804  0.883     0.730   0.908       -0.004 +/-0.180        0.006 +/-0.166       -0.069 +/-0.647
+   300      0.976   0.687  0.806     0.591   0.864       -0.003 +/-0.180       -0.002 +/-0.179       -0.043 +/-0.577
+   400      0.971   0.555  0.706     0.447   0.793       -0.000 +/-0.214       -0.002 +/-0.208       -0.067 +/-0.643
+   500      0.964   0.460  0.622     0.372   0.685        0.000 +/-0.249       -0.007 +/-0.223       -0.040 +/-0.646
+
+resultats dans c:\TRAVAIL\RepositoriesGithub\HOLOTRACKER\report_focus_dense_holo
+exit 0

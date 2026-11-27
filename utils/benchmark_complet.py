@@ -4,7 +4,7 @@
 Filename: benchmark_complet.py
 
 Description:
-Toutes les combinaisons seuil x detection, mesurees sur hologrammes simules (verite terrain
+Toutes les combinaisons seuil x detection, mesurees sur les hologrammes simules de 'SIMULATED HOLO/' (verite terrain
 connue) puis sur le film reel, avec les temps de chaque etape.
 
     seuils            global            moyenne + K x ecart-type du volume entier
@@ -33,8 +33,6 @@ mail: simon.becker@univ-lorraine.fr
 License: GNU General Public License v3.0
 """
 
-import glob
-import json
 import os
 import sys
 import time
@@ -197,15 +195,9 @@ class Chaine:
 
 def mesure_simulation(chaine):
     lignes = []
-    for dossier in sorted(glob.glob(os.path.join(RACINE, "holograms simules", "N*"))):
-        rep = [d for d in glob.glob(os.path.join(dossier, "*")) if os.path.isdir(d)][0]
-        distance = float(json.load(open(os.path.join(rep, "config_simu.json")))[
-            "distance_volume_camera"])
-        for chemin in sorted(glob.glob(os.path.join(rep, "simulated_hologram", "*.npy"))):
-            base = os.path.basename(chemin).replace("holo_", "", 1)[:-4]
-            ref = os.path.join(rep, "holo_ref", "holo_ref_{}.npy".format(base))
-            vrai, phi = banc.lire_verite(rep, base, distance)
-            h = np.load(chemin).astype(np.float32) / np.load(ref).astype(np.float32)
+    for dossier in banc.dossiers_simulation(os.path.join(RACINE, "SIMULATED HOLO")):
+        for n in banc.numeros_hologrammes(dossier):
+            h, vrai, phi = banc.lire_simulation(dossier, n)
             chaine.volume_de_focus(h)
             chaine.statistiques()
             for type_seuil, grille in SEUILS.items():
@@ -217,12 +209,12 @@ def mesure_simulation(chaine):
                                          vrai, phi)
                         lignes.append({
                             "seuil": type_seuil, "detection": mode, "K": K,
-                            "densite": len(vrai), "hologramme": base,
+                            "densite": len(vrai), "hologramme": n,
                             "rappel": sc["rappel"], "precision": sc["precision"],
                             "couchees": sc["rappel_couchees"],
                             "detections": sc["nb_detections"],
                             "f1": f1(sc["rappel"], sc["precision"])})
-        print("   simulation {} faite".format(os.path.basename(dossier)))
+        print("   simulation {} faite".format(os.path.basename(os.path.dirname(dossier))))
     return pd.DataFrame(lignes)
 
 
